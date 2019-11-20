@@ -13,8 +13,9 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     'Click>=7.0',
-    'itk',
     'SimpleITK',
+    'scikit-image',
+    'scipy',
 ]
 
 setup_requirements = [ ]
