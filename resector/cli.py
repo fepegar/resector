@@ -6,13 +6,16 @@ import click
 
 
 @click.command()
-def main(args=None):
+@click.argument(
+    'input-path',
+)
+def main(input_path):
     """Console script for resector."""
-    click.echo("Replace this message by putting your code into "
-               "resector.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
+    import resector
+    resector.resect(input_path)
     return 0
 
 
 if __name__ == "__main__":
+    # pylint: disable=no-value-for-parameter
     sys.exit(main())  # pragma: no cover

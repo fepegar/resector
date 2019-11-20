@@ -11,7 +11,11 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=7.0', ]
+requirements = [
+    'Click>=7.0',
+    'itk',
+    'SimpleITK',
+]
 
 setup_requirements = [ ]
 
@@ -37,7 +41,7 @@ setup(
     description="Algorithm to simulate resections osurgery on brain MRI scans.",
     entry_points={
         'console_scripts': [
-            'resector=resector.cli:main',
+            'resect=resector.cli:main',
         ],
     },
     install_requires=requirements,
