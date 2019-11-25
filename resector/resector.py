@@ -3,6 +3,7 @@
 """Main module."""
 
 from pathlib import Path
+from subprocess import call
 import numpy as np
 from tqdm import tqdm, trange
 import SimpleITK as sitk
@@ -34,34 +35,88 @@ def resect(
     parcellation = read(parcellation_path)
     gray_matter_mask = get_gray_matter_mask(parcellation, hemisphere)
     resectable_hemisphere_mask = get_resectable_hemisphere_mask(parcellation, hemisphere)
-    # write(resectable_hemisphere_mask, '/tmp/resected/resectable.nii.gz')
-    voxel_image = get_random_voxel_image(gray_matter_mask, border=False)
-    sphere_mask = get_sphere_mask(voxel_image, radius)
+
+    resection_mask = get_resection_mask(
+        resectable_hemisphere_mask,
+        gray_matter_mask,
+        radius,
+        opening_radius=opening_radius,
+    )
+
+    # Blend
+    sigmas = np.random.uniform(low=0.5, high=1, size=3)
+    noise_image = read(noise_image_path)
+    resected_brain = blend(brain, noise_image, resection_mask, sigmas)
+
+    write(resected_brain, output_path)
+    write(resection_mask, resection_mask_output_path)
+
+
+def get_resection_mask(
+        resectable_hemisphere_mask,
+        gray_matter_mask,
+        radius,
+        opening_radius=None,
+        method='vtk',
+    ):
+
+    if method == 'vtk':
+        voxel_center = get_random_voxel(gray_matter_mask, border=False)
+        center = gray_matter_mask.TransformIndexToPhysicalPoint(tuple(voxel_center))
+        r, a, s = center
+        center = -r, -a, s  # LPS to RAS
+        reference_path = '/tmp/ref.nii'
+        write(resectable_hemisphere_mask, reference_path)
+        poly_data = get_noisy_sphere_poly_data(
+            center,
+            radius,
+        )
+        model_path = '/tmp/model.vtp'
+        import vtk
+        writer = vtk.vtkXMLPolyDataWriter()
+        writer.SetFileName(model_path)
+        writer.SetInputData(poly_data)
+        writer.Write()
+        result_path = '/tmp/result.nii'
+        sphere_mask = mesh_to_volume(reference_path, model_path, result_path)
+        sphere_mask = read(result_path)
+    else:
+        voxel_image = get_random_voxel_image(gray_matter_mask, border=False)
+        sphere_mask = get_sphere_mask(voxel_image, radius)
 
     # Intersection with resectable area
     resection_mask = sitk.And(resectable_hemisphere_mask, sphere_mask)
 
-    # Add some strels on the border
-    resection_mask = add_structural_elements(resection_mask)
+    if method != 'vtk':
+        # Add some strels on the border
+        resection_mask = add_structural_elements(resection_mask)
 
     # Binary opening to remove leaked CSF from contralateral hemisphere
     if opening_radius is not None:
         resection_mask = sitk.BinaryMorphologicalOpening(
             resection_mask, opening_radius)
 
-    # In case the strels appear outside resectable area
-    resection_mask = sitk.And(resectable_hemisphere_mask, resection_mask)
+    if method != 'vtk':
+        # In case the strels appear outside resectable area
+        resection_mask = sitk.And(resectable_hemisphere_mask, resection_mask)
 
     # Use largest connected component only
     resection_mask = get_largest_connected_component(resection_mask)
 
-    # Blend
-    sigmas = np.random.uniform(low=0.5, high=2, size=3)
-    noise_image = read(noise_image_path)
-    resected_brain = blend(brain, noise_image, resection_mask, sigmas)
+    return resection_mask
 
-    write(resected_brain, output_path)
-    write(resection_mask, resection_mask_output_path)
+
+def mesh_to_volume(reference_path, model_path, result_path):
+    command = (
+        '/home/fernando/opt/Slicer/Nightly/Slicer',
+        '--launch',
+        '/home/fernando/opt/Slicer/Nightly/lib/Slicer-4.11/cli-modules/ModelToLabelMap',
+        reference_path,
+        model_path,
+        result_path,
+    )
+    command = [str(a) for a in command]
+    call(command)
 
 
 def add_structural_elements(mask, min_radius=None, max_radius=None, iterations=3):
@@ -133,7 +188,7 @@ def get_masked_image(image, mask):
     return masked
 
 
-def get_random_voxel_image(mask, border=False):
+def get_random_voxel(mask, border=False):
     if border:
         image = sitk.BinaryContour(mask)
     else:
@@ -143,11 +198,103 @@ def get_random_voxel_image(mask, border=False):
     N = len(coords)
     random_index = np.random.randint(N)
     coords_voxel = coords[random_index]
+    coords_voxel = [int(n) for n in reversed(coords_voxel)]  # NumPy vs ITK
+    return coords_voxel
+
+
+def get_random_voxel_image(mask, border=False):
+    coords_voxel = get_random_voxel(mask, border=border)
     image = sitk.Image(mask)
     image = sitk.Multiply(image, 0)
-    coords_voxel = reversed(coords_voxel.tolist())  # NumPy vs ITK
     image.SetPixel(*coords_voxel, 1)
     return image
+
+
+def get_sphere_poly_data(center, radius, theta=None, phi=None):
+    import vtk
+    sphere_source = vtk.vtkSphereSource()
+    sphere_source.SetCenter(center)
+    sphere_source.SetRadius(radius)
+    if theta is not None:
+        sphere_source.SetThetaResolution(theta)
+    if phi is not None:
+        sphere_source.SetPhiResolution(phi)
+    sphere_source.Update()
+    return sphere_source.GetOutput()
+
+
+def get_noisy_sphere_poly_data(
+        center,
+        radius,
+        theta=None,
+        phi=None,
+        noise_type=None,
+        octaves=None,
+        smoothness=None,
+        noise_amplitude_radius_ratio=None,
+        ):
+    # TODO: apply trsf to sphere to make it an ellipsoid
+    from noise import pnoise3, snoise3
+    import vtk
+    from vtk.util.numpy_support import numpy_to_vtk
+    from vtk.numpy_interface import dataset_adapter as dsa
+
+    theta = 64 if theta is None else theta
+    phi = 64 if phi is None else phi
+    noise_type = 'perlin' if noise_type is None else noise_type
+    assert noise_type in 'perlin', 'simplex'
+    octaves = 2 if octaves is None else octaves
+    smoothness = 10 if smoothness is None else smoothness
+    noise_amplitude_radius_ratio = 0.75 if noise_amplitude_radius_ratio is None else noise_amplitude_radius_ratio
+
+    poly_data = get_sphere_poly_data(center, radius, theta=theta, phi=phi)
+    wrap_data_object = dsa.WrapDataObject(poly_data)
+    points = wrap_data_object.Points
+    normals = wrap_data_object.PointData['Normals']
+
+    noise_amplitude = radius * noise_amplitude_radius_ratio
+    if noise_type == 'perlin':
+        function = pnoise3
+    elif noise_type == 'simplex':
+        function = snoise3
+
+    points_with_noise = []
+    for point, normal in zip(points, normals):
+        x, y, z = point / smoothness
+        noise = function(x, y, z, octaves=octaves)
+        perturbance = noise_amplitude * noise
+        point_with_noise = point + perturbance * normal
+        points_with_noise.append(point_with_noise)
+    points_with_noise = np.array(points_with_noise)
+
+    vertices = vtk.vtkPoints()
+    vertices.SetData(numpy_to_vtk(points_with_noise))
+    poly_data.SetPoints(vertices)
+
+    normalFilter = vtk.vtkPolyDataNormals()
+    normalFilter.AutoOrientNormalsOn()
+    normalFilter.SetComputePointNormals(True)
+    normalFilter.SetComputeCellNormals(True)
+    normalFilter.SplittingOff()
+    normalFilter.SetInputData(poly_data)
+    normalFilter.Update()
+    poly_data = normalFilter.GetOutput()
+
+    return poly_data
+
+
+def get_noise_sphere_image(
+        reference,
+        center,
+        radius,
+        theta=None,
+        phi=None,
+        noise_type=None,
+        octaves=None,
+        smoothness=None,
+        noise_amplitude_radius_ratio=None,
+        ):
+    return
 
 
 def get_sphere_mask(voxel_image, radius, approximate=True):
@@ -273,7 +420,7 @@ def write(image, image_path):
     sitk.WriteImage(image, str(image_path))
 
 
-def main():
+if __name__ == "__main__":
     np.random.seed(42)
     # input_path = Path('~/Dropbox/MRI/t1.nii.gz').expanduser()
     # # brain_segmentation_path = Path('~/Dropbox/MRI/t1_brain_seg.nii.gz').expanduser()
@@ -281,7 +428,7 @@ def main():
     # input_path = '/home/fernando/episurg/mri/mni_alejandro/MNI_152_mri.nii.gz'
     # parcellation_path = '/home/fernando/episurg/mri/mni_alejandro/MNI_152_gif.nii.gz'
 
-    output_dir = Path('/tmp/resected')
+    output_dir = Path('/tmp/resected_perlin')
     output_dir.mkdir(exist_ok=True)
     # if output_dir.is_dir():
     #     import shutil
@@ -310,5 +457,55 @@ def main():
         )
 
 
-if __name__ == "__main__":
-    main()
+
+
+
+
+
+
+
+
+
+
+    # sphere_path = '/tmp/noisy_sphere.vtp'
+    # center = -37, 38, -24
+    # radius = 30
+    # pd = get_noisy_sphere_poly_data(
+    #     center,
+    #     radius,
+    # )
+    # import vtk
+    # writer = vtk.vtkXMLPolyDataWriter()
+    # writer.SetFileName(sphere_path)
+    # writer.SetInputData(pd)
+    # writer.Write()
+    # # m = vtk.vtkVoxelModeller()
+    # # m.SetScalarTypeToChar()
+    # # m.SetInputData(pd)
+    # # output = m.GetOutput()
+
+    # ref = read(input_path)
+    # white_image = vtk.vtkImageData()
+    # white_image.SetSpacing(ref.GetSpacing())
+    # white_image.SetDimensions(ref.GetSize())
+    # white_image.SetOrigin(ref.GetOrigin())
+
+    # pol2stenc = vtk.vtkPolyDataToImageStencil()
+    # pol2stenc.SetInputData(pd)
+    # pol2stenc.SetOutputOrigin(ref.GetOrigin())
+    # pol2stenc.SetOutputSpacing(ref.GetSpacing())
+    # extent = list(zip((0, 0, 0), ref.GetSize()))
+    # extent = np.array(extent).flatten()
+    # pol2stenc.SetOutputWholeExtent(extent)
+    # pol2stenc.Update()
+
+    # import itk
+    # Dimension = 2
+    # PixelType = itk.UC
+    # ImageType = itk.Image[PixelType, Dimension]
+    # vtkToItkFilter = itk.VTKImageToImageFilter[ImageType].New()
+    # vtkToItkFilter.SetInput(pol2stenc.GetOutput())
+
+    # vtkToItkFilter.Update()
+    # myitkImage = vtkToItkFilter.GetOutput()
+    # myitkImage.SetDirection(ref.GetDirection())
