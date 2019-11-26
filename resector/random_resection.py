@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import SimpleITK as sitk
 
+from .io import nib_to_sitk
 from .resector import _resect
 
 
@@ -12,10 +13,12 @@ class Hemisphere(enum.Enum):
 
 
 class RandomResection:
-    def __init__(self, volumes):
+    def __init__(self, volumes_range=None, volumes=None, verbose=False):
         # From episurg dataset (although it looks bimodal)
         self.volumes = volumes
+        self.volumes_range = volumes_range
         self.sigmas_range = 0.5, 1
+        self.verbose = verbose
 
     def __call__(self, sample):
         """
@@ -26,18 +29,25 @@ class RandomResection:
         Assume there is a key 'gray_matter_right' in sample dict
         Assume there is a key 'noise' in sample dict
         """
+        if self.verbose:
+            import time
+            start = time.time()
         resection_params = self.get_params(
             self.volumes,
+            self.volumes_range,
             self.sigmas_range,
         )
-        brain = self.nib_to_sitk(sample['image'][0], sample['affine'])
+        brain = nib_to_sitk(sample['image'][0], sample['affine'])
         hemisphere = resection_params['hemisphere']
-        gray_matter_mask = self.nib_to_sitk(
+        gray_matter_mask = nib_to_sitk(
             sample[f'gray_matter_{hemisphere}'], sample['affine'])
-        resectable_hemisphere_mask = self.nib_to_sitk(
+        resectable_hemisphere_mask = nib_to_sitk(
             sample[f'resectable_{hemisphere}'], sample['affine'])
-        noise_image = self.nib_to_sitk(
+        noise_image = nib_to_sitk(
             sample['noise'], sample['affine'])
+        if self.verbose:
+            duration = time.time() - start
+            print(f'[Prepare resection images]: {duration:.1f} seconds')
 
         resected_brain, resection_mask, resection_center = _resect(
             brain,
@@ -46,6 +56,7 @@ class RandomResection:
             noise_image,
             resection_params['volume'],
             resection_params['sigmas'],
+            verbose=self.verbose,
         )
         resection_params['resection_center'] = resection_center
         resected_brain_array = self.sitk_to_array(resected_brain)
@@ -59,19 +70,27 @@ class RandomResection:
         sample['random_resection'] = resection_params
         sample['image'] = image_resected
         sample['label'] = resection_label
+
+        if self.verbose:
+            duration = time.time() - start
+            print(f'RandomResection: {duration:.1f} seconds')
         return sample
 
     @staticmethod
     def get_params(
             volumes,
+            volumes_range,
             sigmas_range,
         ):
-
         # Hemisphere
         hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
 
         # Equivalent sphere volume
-        volume = torch.FloatTensor(1).uniform_(*volumes).item()
+        if volumes is None:
+            volume = torch.FloatTensor(1).uniform_(*volumes_range).item()
+        else:
+            index = torch.randint(len(volumes), (1,)).item()
+            volume = volumes[index]
 
         # Sigmas for mask gaussian blur
         sigmas = torch.FloatTensor(3).uniform_(*sigmas_range).tolist()
@@ -86,19 +105,6 @@ class RandomResection:
     @staticmethod
     def flip_coin():
         return torch.rand(1) >= 0.5
-
-    @staticmethod
-    def nib_to_sitk(array, affine):
-        """
-        TODO: figure out how to get directions from affine
-        so that I don't need this
-        """
-        import nibabel as nib
-        from tempfile import NamedTemporaryFile
-        with NamedTemporaryFile(suffix='.nii') as f:
-            nib.Nifti1Image(array, affine).to_filename(f.name)
-            image = sitk.ReadImage(f.name)
-        return image
 
     @staticmethod
     def sitk_to_array(image):
