@@ -13,7 +13,6 @@ class Hemisphere(enum.Enum):
 
 class RandomResection:
     def __init__(self):
-        self._color_table = None
         # From episurg dataset (although it looks bimodal)
         self.volume_mean = 10000
         self.volume_std = 5900
