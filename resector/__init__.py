@@ -7,3 +7,4 @@ __email__ = 'fernando.perezgarcia.17@ucl.ac.uk'
 __version__ = '0.1.0'
 
 from .resector import resect
+from .random_resection import RandomResection

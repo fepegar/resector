@@ -12,10 +12,9 @@ class Hemisphere(enum.Enum):
 
 
 class RandomResection:
-    def __init__(self):
+    def __init__(self, volumes):
         # From episurg dataset (although it looks bimodal)
-        self.volume_mean = 10000
-        self.volume_std = 5900
+        self.volumes = volumes
         self.sigmas_range = 0.5, 1
 
     def __call__(self, sample):
@@ -23,18 +22,18 @@ class RandomResection:
         Assume there is a single channel in sample['image']
         Assume there is a key 'resectable_left' in sample dict
         Assume there is a key 'resectable_right' in sample dict
-        Assume there is a key 'gray_matter' in sample dict
+        Assume there is a key 'gray_matter_left' in sample dict
+        Assume there is a key 'gray_matter_right' in sample dict
         Assume there is a key 'noise' in sample dict
         """
         resection_params = self.get_params(
-            self.volume_mean,
-            self.volume_std,
+            self.volumes,
             self.sigmas_range,
         )
         brain = self.nib_to_sitk(sample['image'][0], sample['affine'])
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = self.nib_to_sitk(
-            sample['gray_matter'], sample['affine'])
+            sample[f'gray_matter_{hemisphere}'], sample['affine'])
         resectable_hemisphere_mask = self.nib_to_sitk(
             sample[f'resectable_{hemisphere}'], sample['affine'])
         noise_image = self.nib_to_sitk(
@@ -45,46 +44,41 @@ class RandomResection:
             gray_matter_mask,
             resectable_hemisphere_mask,
             noise_image,
-            resection_params['radius'],
+            resection_params['volume'],
             resection_params['sigmas'],
         )
-
+        resection_params['resection_center'] = resection_center
         resected_brain_array = self.sitk_to_array(resected_brain)
         resected_mask_array = self.sitk_to_array(resection_mask)
-
         image_resected = self.add_channels_axis(resected_brain_array)
         resection_label = self.add_background_channel(resected_mask_array)
-        resection_params['resection_center'] = resection_center
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
+
+        # Update sample
+        sample['random_resection'] = resection_params
         sample['image'] = image_resected
         sample['label'] = resection_label
-        sample['resection_params'] = resection_params
         return sample
 
     @staticmethod
     def get_params(
-            volume_mean,
-            volume_std,
+            volumes,
             sigmas_range,
         ):
 
         # Hemisphere
         hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
 
-        # Sphere radius
-        volume = -1
-        tensor = torch.FloatTensor(1)
-        while volume < 0:
-            volume = tensor.normal_(volume_mean, volume_std).item()
-        radius = (3 / 4 * volume * np.pi)**(1 / 3)
+        # Equivalent sphere volume
+        volume = torch.FloatTensor(1).uniform_(*volumes).item()
 
-        # Gaussian blur sigmas
+        # Sigmas for mask gaussian blur
         sigmas = torch.FloatTensor(3).uniform_(*sigmas_range).tolist()
 
         parameters = dict(
             hemisphere=hemisphere.value,
-            radius=radius,
+            volume=volume,
             sigmas=sigmas,
         )
         return parameters
@@ -118,4 +112,4 @@ class RandomResection:
     @staticmethod
     def add_background_channel(foreground):
         background = 1 - foreground
-        return np.concatenate((background, foreground))
+        return np.stack((background, foreground))
