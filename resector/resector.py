@@ -112,8 +112,12 @@ def get_resection_mask_from_mesh(
                     poly_data = add_noise_to_poly_data(poly_data, radius, verbose=verbose)
 
                 writer = vtk.vtkXMLPolyDataWriter()
-                writer.SetFileName(model_path)
                 writer.SetInputData(poly_data)
+                writer.SetFileName(model_path)
+                writer.Write()
+
+                # Debugging
+                writer.SetFileName('/tmp/test.vtp')
                 writer.Write()
 
                 write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image

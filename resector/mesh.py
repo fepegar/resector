@@ -64,14 +64,15 @@ def add_noise_to_poly_data(
     vertices.SetData(numpy_to_vtk(points_with_noise))
     poly_data.SetPoints(vertices)
 
-    normals_filter = vtk.vtkPolyDataNormals()
-    normals_filter.AutoOrientNormalsOn()
-    normals_filter.SetComputePointNormals(True)
-    normals_filter.SetComputeCellNormals(True)
-    normals_filter.SplittingOff()
-    normals_filter.SetInputData(poly_data)
-    normals_filter.Update()
-    poly_data = normals_filter.GetOutput()
+    normal_filter = vtk.vtkPolyDataNormals()
+    normal_filter.AutoOrientNormalsOn()
+    normal_filter.SetComputePointNormals(True)
+    normal_filter.SetComputeCellNormals(True)
+    normal_filter.SplittingOff()
+    normal_filter.SetInputData(poly_data)
+    normal_filter.ConsistencyOn()
+    normal_filter.Update()
+    poly_data = normal_filter.GetOutput()
     if verbose:
         duration = time.time() - start
         print(f'add_noise_to_poly_data: {duration:.1f} seconds')
