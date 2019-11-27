@@ -13,11 +13,28 @@ class Hemisphere(enum.Enum):
 
 
 class RandomResection:
-    def __init__(self, volumes_range=None, volumes=None, verbose=False):
-        # From episurg dataset (although it looks bimodal)
+    def __init__(
+            self,
+            volumes_range=None,
+            volumes=None,
+            sigmas_range=(0.5, 1),
+            radii_ratio_range=(0.5, 1.5),
+            angles_range=(0, 180),
+            verbose=False,
+            ):
+        """
+        Either volumes or volume_range should be passed
+        volumes is an iterable of possible volumes (they come from EPISURG)
+        volumes_range is a range for a uniform distribution (TODO: fit a distribution)
+        """
+        if (volumes is None and volumes_range is None
+                or volumes is not None and volumes_range is not None):
+            raise
         self.volumes = volumes
         self.volumes_range = volumes_range
-        self.sigmas_range = 0.5, 1
+        self.sigmas_range = sigmas_range
+        self.radii_ratio_range = radii_ratio_range
+        self.angles_range = angles_range
         self.verbose = verbose
 
     def __call__(self, sample):
@@ -36,6 +53,8 @@ class RandomResection:
             self.volumes,
             self.volumes_range,
             self.sigmas_range,
+            self.radii_ratio_range,
+            self.angles_range,
         )
         brain = nib_to_sitk(sample['image'][0], sample['affine'])
         hemisphere = resection_params['hemisphere']
@@ -56,6 +75,8 @@ class RandomResection:
             noise_image,
             resection_params['volume'],
             resection_params['sigmas'],
+            resection_params['radii_ratio'],
+            resection_params['angles'],
             verbose=self.verbose,
         )
         resection_params['resection_center'] = resection_center
@@ -81,6 +102,8 @@ class RandomResection:
             volumes,
             volumes_range,
             sigmas_range,
+            radii_ratio_range,
+            angles_range,
         ):
         # Hemisphere
         hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
@@ -95,10 +118,18 @@ class RandomResection:
         # Sigmas for mask gaussian blur
         sigmas = torch.FloatTensor(3).uniform_(*sigmas_range).tolist()
 
+        # Ratio between two of the radii of the ellipsoid
+        radii_ratio = torch.FloatTensor(1).uniform_(*radii_ratio_range).item()
+
+        # Rotation angles of the ellipsoid
+        angles = torch.FloatTensor(3).uniform_(*angles_range).tolist()
+
         parameters = dict(
             hemisphere=hemisphere.value,
             volume=volume,
             sigmas=sigmas,
+            radii_ratio=radii_ratio,
+            angles=angles,
         )
         return parameters
 

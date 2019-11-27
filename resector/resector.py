@@ -13,7 +13,7 @@ import numpy as np
 import SimpleITK as sitk
 
 from .io import read, write
-from .mesh import get_sphere_poly_data, add_noise_to_poly_data, mesh_to_volume
+from .mesh import get_ellipsoid_poly_data, add_noise_to_poly_data, mesh_to_volume
 from .parcellation import (
     get_gray_matter_mask,
     get_resectable_hemisphere_mask,
@@ -22,23 +22,26 @@ from .parcellation import (
 
 
 def resect(
-            input_path,
-            parcellation_path,
-            noise_image_path,
-            output_path,
-            resection_mask_output_path,
-            hemisphere,
-            radius,
-            sigmas=None,
-            opening_radius=None,
+        input_path,
+        parcellation_path,
+        noise_image_path,
+        output_path,
+        resection_mask_output_path,
+        hemisphere,
+        radius,
+        sigmas=None,
+        opening_radius=None,
         ):
+    """
+    TODO: fix this?
+    """
     brain = read(input_path)
     parcellation = read(parcellation_path)
     noise_image = read(noise_image_path)
 
     # Blend
     if sigmas is None:
-        sigmas = np.random.uniform(low=0.5, high=1, size=3)
+        sigmas = np.random.uniform(low=0.2, high=1, size=3)
 
     gray_matter_mask = get_gray_matter_mask(parcellation, hemisphere)
     resectable_hemisphere_mask = get_resectable_hemisphere_mask(
@@ -57,18 +60,22 @@ def resect(
 
 
 def _resect(
-            brain,
-            gray_matter_mask,
-            resectable_hemisphere_mask,
-            noise_image,
-            volume,
-            sigmas,
-            verbose=False,
+        brain,
+        gray_matter_mask,
+        resectable_hemisphere_mask,
+        noise_image,
+        volume,
+        sigmas,
+        radii_ratio,
+        angles,
+        verbose=False,
         ):
     resection_mask, center_ras = get_resection_mask_from_mesh(
         resectable_hemisphere_mask,
         gray_matter_mask,
         volume,
+        radii_ratio,
+        angles,
         verbose=verbose,
     )
     if verbose:
@@ -81,10 +88,12 @@ def _resect(
 
 
 def get_resection_mask_from_mesh(
-            resectable_hemisphere_mask,
-            gray_matter_mask,
-            volume,
-            verbose=False,
+        resectable_hemisphere_mask,
+        gray_matter_mask,
+        volume,
+        radii_ratio,
+        angles,
+        verbose=False,
         ):
     """
     TODO: figure out how to do this with VTK and ITK
@@ -102,9 +111,18 @@ def get_resection_mask_from_mesh(
                 model_path = model_file.name
                 result_path = result_file.name
 
-                # Create noisy sphere
+                # As the center of the sphere lies at the border of the brain,
+                # volume should be the volume of a hemisphere. We ignore this to
+                # take into account gray matter that is in deep sulci and to
+                # create smaller resections, i.e. harder cases
                 radius = (3 / 2 * volume / tau)**(1 / 3)
-                poly_data = get_sphere_poly_data(center_ras, radius)
+
+                poly_data = get_ellipsoid_poly_data(
+                    center_ras,
+                    radius,
+                    radii_ratio,
+                    angles,
+                )
                 with warnings.catch_warnings():
                     # To ignore this warning:
                     # https://gitlab.kitware.com/vtk/vtk/merge_requests/4847
