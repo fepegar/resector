@@ -37,7 +37,7 @@ class RandomResection:
         """
         if (volumes is None and volumes_range is None
                 or volumes is not None and volumes_range is not None):
-            raise
+            raise ValueError('Please enter a value for volumes or volumes_range')
         self.volumes = volumes
         self.volumes_range = volumes_range
         self.sigmas_range = sigmas_range
