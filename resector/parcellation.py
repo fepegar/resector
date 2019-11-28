@@ -127,9 +127,9 @@ def make_noise_image(image_path, parcellation_path, output_path, threshold=True)
         otsu = filters.threshold_otsu(csf_values)
         csf_values = csf_values[csf_values < otsu]
     # assume normal distribution
-    noise_array = torch.FloatTensor(image_array.shape)
-    noise_array.normal_(csf_values.mean(), csf_values.std()).numpy()
-    noise_image = nib_to_sitk(noise_array, image_nii.affine)
+    noise_tensor = torch.FloatTensor(image_array.shape)
+    noise_tensor = noise_tensor.normal_(csf_values.mean(), csf_values.std())
+    noise_image = nib_to_sitk(noise_tensor.numpy(), image_nii.affine)
     write(noise_image, output_path)
 
 
