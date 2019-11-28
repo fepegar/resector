@@ -20,6 +20,7 @@ class RandomResection:
             sigmas_range=(0.5, 1),
             radii_ratio_range=(0.5, 1.5),
             angles_range=(0, 180),
+            delete_keys=True,
             verbose=False,
             ):
         """
@@ -42,6 +43,7 @@ class RandomResection:
         self.sigmas_range = sigmas_range
         self.radii_ratio_range = radii_ratio_range
         self.angles_range = angles_range
+        self.delete_keys = delete_keys
         self.verbose = verbose
 
     def __call__(self, sample):
@@ -90,6 +92,13 @@ class RandomResection:
         sample['random_resection'] = resection_params
         sample['image'] = image_resected
         sample['label'] = resection_label
+
+        if self.delete_keys:
+            del sample['gray_matter_left']
+            del sample['gray_matter_right']
+            del sample['resectable_left']
+            del sample['resectable_right']
+            del sample['noise']
 
         if self.verbose:
             duration = time.time() - start
