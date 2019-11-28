@@ -118,8 +118,7 @@ def get_image_from_reference(array, reference):
 
 def make_noise_image(image_path, parcellation_path, output_path, threshold=True):
     image_nii = nib.load(str(image_path))
-    parcellation = read(parcellation_path)
-    csf_mask = get_csf_mask(parcellation)
+    csf_mask = get_csf_mask(parcellation_path)
     image_array = image_nii.get_data()
     csf_mask_array = sitk.GetArrayViewFromImage(csf_mask) > 0  # to bool needed
     csf_values = image_array[csf_mask_array]
