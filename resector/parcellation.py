@@ -117,7 +117,7 @@ def get_image_from_reference(array, reference):
 
 
 def make_noise_image(image_path, parcellation_path, output_path, threshold=True):
-    image_nii = nib.load(image_path)
+    image_nii = nib.load(str(image_path))
     parcellation = read(parcellation_path)
     csf_mask = get_csf_mask(parcellation)
     image_array = image_nii.get_data()
