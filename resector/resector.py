@@ -162,6 +162,7 @@ def get_resection_mask_from_mesh(
 
 
 def blend(image, noise_image, mask, sigmas):
+    image = sitk.Cast(image, noise_image.GetPixelID())
     mask = sitk.Cast(mask, noise_image.GetPixelID())
     mask = sitk.SmoothingRecursiveGaussian(mask, sigmas)
     alpha = mask
