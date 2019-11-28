@@ -68,7 +68,7 @@ def get_csf_mask(parcellation_path, erode_radius=1):
             label = int(label)
             progress.set_description(f'Removing {name}')
             parcellation_array[parcellation_array == label] = 0
-    csf_mask_array = parcellation_array > 0
+    csf_mask_array = (parcellation_array > 0).astype(np.uint8)
     csf_mask = nib_to_sitk(csf_mask_array, parcellation_nii.affine)
     if erode_radius is not None:
         csf_mask = sitk.BinaryErode(csf_mask, erode_radius)
@@ -128,7 +128,7 @@ def make_noise_image(image_path, parcellation_path, output_path, threshold=True)
     # assume normal distribution
     noise_array = torch.FloatTensor(image_array.shape)
     noise_array.normal_(csf_values.mean(), csf_values.std()).numpy()
-    noise_image = get_image_from_reference(noise_array, image_nii.affine)
+    noise_image = nib_to_sitk(noise_array, image_nii.affine)
     write(noise_image, output_path)
 
 
