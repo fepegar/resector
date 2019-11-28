@@ -50,7 +50,7 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
     return mask
 
 
-def get_csf_mask(parcellation_path, erode_radius=1):
+def get_csf_mask(parcellation_path, erode_radius=1) -> sitk.Image:
     parcellation_nii = nib.load(str(parcellation_path))
     parcellation_array = parcellation_nii.get_data().astype(np.uint8)
     parcellation_array[parcellation_array == 1] = 0  # should I remove this?
@@ -121,6 +121,7 @@ def make_noise_image(image_path, parcellation_path, output_path, threshold=True)
     csf_mask = get_csf_mask(parcellation_path)
     image_array = image_nii.get_data()
     csf_mask_array = sitk.GetArrayViewFromImage(csf_mask) > 0  # to bool needed
+    csf_mask_array = csf_mask_array.transpose(2, 1, 0)  # sitk to np
     csf_values = image_array[csf_mask_array]
     if threshold:  # remove non-CSF voxels
         otsu = filters.threshold_otsu(csf_values)
