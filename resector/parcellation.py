@@ -44,6 +44,7 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
     remove_pattern(array, 'white')
     remove_pattern(array, 'caudate')
     remove_pattern(array, 'putamen')
+    remove_pattern(array, 'pallidum')
     remove_pattern(array, 'thalamus')
     remove_pattern(array, 'Ventral-DC')
     mask = nib_to_sitk(array, parcellation_nii.affine) > 0
