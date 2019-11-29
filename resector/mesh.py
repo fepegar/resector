@@ -1,13 +1,18 @@
 import sys
 import time
+import shutil
 from pathlib import Path
 from subprocess import call, DEVNULL
+from tempfile import NamedTemporaryFile
 
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk
 from vtk.numpy_interface import dataset_adapter as dsa
 import numpy as np
+import nibabel as nib
 from noise import pnoise3, snoise3
+
+from .io import nib_to_sitk
 
 
 def get_sphere_poly_data(center, radius, theta=64, phi=64):
@@ -21,7 +26,6 @@ def get_sphere_poly_data(center, radius, theta=64, phi=64):
         sphere_source.SetPhiResolution(phi)
     sphere_source.Update()
     return sphere_source.GetOutput()
-    # return get_ellipsoid_poly_data(center, radii_ratio, (0, 0, 0))
 
 
 def get_ellipsoid_poly_data(
@@ -52,12 +56,12 @@ def get_ellipsoid_poly_data(
     transform.RotateY(y_angle)
     transform.RotateZ(z_angle)
 
-    tf = vtk.vtkTransformPolyDataFilter()
-    tf.SetTransform(transform)
-    tf.SetInputData(parametricSource.GetOutput())
-    tf.Update()
+    transform = vtk.vtkTransformPolyDataFilter()
+    transform.SetTransform(transform)
+    transform.SetInputData(parametricSource.GetOutput())
+    transform.Update()
 
-    poly_data = tf.GetOutput()
+    poly_data = transform.GetOutput()
     return poly_data
 
 
@@ -144,7 +148,12 @@ def get_slicer_paths(version='4.11'):
     return slicer_bin_path, slicer_module_path
 
 
-def mesh_to_volume(reference_path, model_path, result_path, verbose=False):
+def mesh_to_volume_slicer(reference_path, model_path, result_path, verbose=False):
+    # There must be something already in result_path so that
+    # Slicer can load the vtkMRMLVolumeNode? So many ugly hacks :(
+    shutil.copy2(reference_path, result_path)
+    # TODO: check if the previous copy is still needed
+
     if verbose:
         start = time.time()
     _, slicer_module_path = get_slicer_paths()
@@ -159,6 +168,75 @@ def mesh_to_volume(reference_path, model_path, result_path, verbose=False):
     if verbose:
         duration = time.time() - start
         print(f'mesh_to_volume: {duration:.1f} seconds')
+
+
+def mesh_to_volume(poly_data, reference_path):
+    """
+    TODO: stop reading and writing so much stuff
+    Write to buffer? Bytes? Investigate this
+    """
+    nii = nib.load(str(reference_path))
+    image_stencil_array = np.ones(nii.shape, dtype=np.uint8)
+    image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.get_qform())
+
+    with NamedTemporaryFile(suffix='.nii') as f:
+        stencil_path = f.name
+        image_stencil_nii.to_filename(stencil_path)
+        image_stencil_reader = vtk.vtkNIFTIImageReader()
+        image_stencil_reader.SetFileName(stencil_path)
+        image_stencil_reader.Update()
+
+    image_stencil = image_stencil_reader.GetOutput()
+    xyz_to_ijk = image_stencil_reader.GetQFormMatrix()
+    if xyz_to_ijk is None:
+        import warnings
+        warnings.warn('No qform found. Using sform')
+        xyz_to_ijk = image_stencil_reader.GetSFormMatrix()
+    xyz_to_ijk.Invert()
+
+    transform = vtk.vtkTransform()
+    transform.SetMatrix(xyz_to_ijk)
+
+    transform_poly_data = vtk.vtkTransformPolyDataFilter()
+    transform_poly_data.SetTransform(transform)
+    transform_poly_data.SetInputData(poly_data)
+    transform_poly_data.Update()
+    pd_ijk = transform_poly_data.GetOutput()
+
+    polyDataToImageStencil = vtk.vtkPolyDataToImageStencil()
+    polyDataToImageStencil.SetInputData(pd_ijk)
+    polyDataToImageStencil.SetOutputSpacing(image_stencil.GetSpacing())
+    polyDataToImageStencil.SetOutputOrigin(image_stencil.GetOrigin())
+    polyDataToImageStencil.SetOutputWholeExtent(image_stencil.GetExtent())
+    polyDataToImageStencil.Update()
+
+    stencil = vtk.vtkImageStencil()
+    stencil.SetInputData(image_stencil)
+    stencil.SetStencilData(polyDataToImageStencil.GetOutput())
+    stencil.SetBackgroundValue(0)
+    stencil.Update()
+
+    image_output = stencil.GetOutput()
+
+    data_object = dsa.WrapDataObject(image_output)
+    array = data_object.PointData['NIFTI']
+    array = array.reshape(nii.shape, order='F')  # C didn't work :)
+    array = check_qfac(nii, array)
+
+    output_image = nib_to_sitk(array, nii.affine)
+    return output_image
+
+
+def check_qfac(nifti, array):
+    """
+    See https://vtk.org/pipermail/vtk-developers/2016-November/034479.html
+    """
+    qfac = nifti.header['pixdim'][0]
+    if qfac not in (-1, 1):
+        raise ValueError(f'Unknown qfac value: {qfac}')
+    elif qfac == -1:
+        array = array[..., ::-1]
+    return array
 
 
 def write_poly_data(poly_data, path):

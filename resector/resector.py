@@ -3,12 +3,10 @@
 """Main module."""
 
 import time
-import shutil
 import warnings
 from math import tau
 from tempfile import NamedTemporaryFile
 
-import vtk
 import numpy as np
 import SimpleITK as sitk
 
@@ -105,47 +103,30 @@ def get_resection_mask_from_mesh(
     l, p, s = center_lps
     center_ras = -l, -p, s
     with NamedTemporaryFile(suffix='.nii') as reference_file:
-        with NamedTemporaryFile(suffix='.vtp') as model_file:
-            with NamedTemporaryFile(suffix='.nii') as result_file:
-                reference_path = reference_file.name
-                model_path = model_file.name
-                result_path = result_file.name
+        with NamedTemporaryFile(suffix='.nii') as result_file:
+            reference_path = reference_file.name
+            result_path = result_file.name
 
-                # As the center of the sphere lies at the border of the brain,
-                # volume should be the volume of a hemisphere. We ignore this to
-                # take into account gray matter that is in deep sulci and to
-                # create smaller resections, i.e. harder cases
-                radius = (3 / 2 * volume / tau)**(1 / 3)
+            # As the center of the sphere lies at the border of the brain,
+            # volume should be the volume of a hemisphere. We ignore this to
+            # take into account gray matter that is in deep sulci and to
+            # create smaller resections, i.e. harder cases
+            radius = (3 / 2 * volume / tau)**(1 / 3)
 
-                poly_data = get_ellipsoid_poly_data(
-                    center_ras,
-                    radius,
-                    radii_ratio,
-                    angles,
-                )
-                with warnings.catch_warnings():
-                    # To ignore this warning:
-                    # https://gitlab.kitware.com/vtk/vtk/merge_requests/4847
-                    warnings.simplefilter("ignore")
-                    poly_data = add_noise_to_poly_data(poly_data, radius, verbose=verbose)
+            poly_data = get_ellipsoid_poly_data(
+                center_ras,
+                radius,
+                radii_ratio,
+                angles,
+            )
+            with warnings.catch_warnings():
+                # To ignore this warning:
+                # https://gitlab.kitware.com/vtk/vtk/merge_requests/4847
+                warnings.simplefilter("ignore")
+                poly_data = add_noise_to_poly_data(poly_data, radius, verbose=verbose)
 
-                writer = vtk.vtkXMLPolyDataWriter()
-                writer.SetInputData(poly_data)
-                writer.SetFileName(model_path)
-                writer.Write()
-
-                # Debugging
-                writer.SetFileName('/tmp/test.vtp')
-                writer.Write()
-
-                write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
-
-                # There must be something already in result_path so that
-                # Slicer can load the vtkMRMLVolumeNode? So many ugly hacks :(
-                shutil.copy2(reference_path, result_path)
-
-                mesh_to_volume(reference_path, model_path, result_path, verbose=verbose)
-                sphere_mask = read(result_path)
+            write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
+            sphere_mask = mesh_to_volume(poly_data, reference_path, result_path)
 
     # Intersection with resectable area
     resection_mask = sitk.And(resectable_hemisphere_mask, sphere_mask)
