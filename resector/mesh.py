@@ -15,20 +15,40 @@ from noise import pnoise3, snoise3
 from .io import nib_to_sitk
 
 
-def get_sphere_poly_data(center, radius, theta=64, phi=64):
-    # TODO: apply trsf to sphere to make it an ellipsoid
+def get_ellipsoid_poly_data(center, radii, angles, theta=64, phi=64):
+    """
+    Radii can have length 1 or 3
+    Angles are in degrees
+    """
+    try:
+        iter(radii)
+    except TypeError:
+        radii = 3 * (radii,)
     sphere_source = vtk.vtkSphereSource()
-    sphere_source.SetCenter(center)
-    sphere_source.SetRadius(radius)
     if theta is not None:
         sphere_source.SetThetaResolution(theta)
     if phi is not None:
         sphere_source.SetPhiResolution(phi)
     sphere_source.Update()
-    return sphere_source.GetOutput()
+
+    transform = vtk.vtkTransform()
+    transform.Translate(center)
+    x_angle, y_angle, z_angle = angles  # there must be a better way
+    transform.RotateX(x_angle)
+    transform.RotateY(y_angle)
+    transform.RotateZ(z_angle)
+    transform.Scale(*radii)
+
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputConnection(sphere_source.GetOutputPort())
+    transform_filter.Update()
+
+    poly_data = transform_filter.GetOutput()
+    return poly_data
 
 
-def get_ellipsoid_poly_data(
+def get_ellipsoid_poly_data_(
         center,
         radius,
         radii_ratio,
@@ -45,9 +65,9 @@ def get_ellipsoid_poly_data(
     ellipsoid.SetYRadius(b)
     ellipsoid.SetZRadius(c)
 
-    parametricSource = vtk.vtkParametricFunctionSource()
-    parametricSource.SetParametricFunction(ellipsoid)
-    parametricSource.Update()
+    parametric_source = vtk.vtkParametricFunctionSource()
+    parametric_source.SetParametricFunction(ellipsoid)
+    parametric_source.Update()
 
     transform = vtk.vtkTransform()
     transform.Translate(center)
@@ -56,12 +76,12 @@ def get_ellipsoid_poly_data(
     transform.RotateY(y_angle)
     transform.RotateZ(z_angle)
 
-    transform = vtk.vtkTransformPolyDataFilter()
-    transform.SetTransform(transform)
-    transform.SetInputData(parametricSource.GetOutput())
-    transform.Update()
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputData(parametric_source.GetOutput())
+    transform_filter.Update()
 
-    poly_data = transform.GetOutput()
+    poly_data = transform_filter.GetOutput()
     return poly_data
 
 
