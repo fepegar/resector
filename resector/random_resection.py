@@ -1,6 +1,7 @@
 import enum
 import torch
 import numpy as np
+from math import tau
 import SimpleITK as sitk
 
 from .io import nib_to_sitk
@@ -76,7 +77,7 @@ class RandomResection:
             noise_image,
             resection_params['volume'],
             resection_params['sigmas'],
-            resection_params['radii_ratio'],
+            resection_params['radii'],
             resection_params['angles'],
             verbose=self.verbose,
         )
@@ -129,6 +130,16 @@ class RandomResection:
         # Ratio between two of the radii of the ellipsoid
         radii_ratio = torch.FloatTensor(1).uniform_(*radii_ratio_range).item()
 
+        # As the center of the sphere lies at the border of the brain,
+        # volume should be the volume of a hemisphere. We ignore this to
+        # take into account gray matter that is in deep sulci and to
+        # create smaller resections, i.e. harder cases
+        radius = (3 / 2 * volume / tau)**(1 / 3)
+        a = radius
+        b = a * radii_ratio
+        c = radius ** 3 / (a * b)  # a * b * c = r**3
+        radii = a, b, c
+
         # Rotation angles of the ellipsoid
         angles = torch.FloatTensor(3).uniform_(*angles_range).tolist()
 
@@ -136,8 +147,8 @@ class RandomResection:
             hemisphere=hemisphere.value,
             volume=volume,
             sigmas=sigmas,
-            radii_ratio=radii_ratio,
             angles=angles,
+            radii=radii,
         )
         return parameters
 
