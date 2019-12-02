@@ -75,7 +75,6 @@ class RandomResection:
             gray_matter_mask,
             resectable_hemisphere_mask,
             noise_image,
-            resection_params['volume'],
             resection_params['sigmas'],
             resection_params['radii'],
             resection_params['angles'],
