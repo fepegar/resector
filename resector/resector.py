@@ -18,42 +18,43 @@ from .parcellation import (
 )
 
 
-# def resect(
-#         input_path,
-#         parcellation_path,
-#         noise_image_path,
-#         output_path,
-#         resection_mask_output_path,
-#         hemisphere,
-#         radius,
-#         sigmas=None,
-#         opening_radius=None,
-#         ):
-#     """
-#     TODO: fix this?
-#     """
-#     brain = read(input_path)
-#     parcellation = read(parcellation_path)
-#     noise_image = read(noise_image_path)
+def resect(
+        input_path,
+        parcellation_path,
+        noise_image_path,
+        output_path,
+        resection_mask_output_path,
+        hemisphere,
+        radius,
+        sigmas=None,
+        opening_radius=None,
+        ):
+    """
+    TODO: fix this?
+    """
+    # brain = read(input_path)
+    # parcellation = read(parcellation_path)
+    # noise_image = read(noise_image_path)
 
-#     # Blend
-#     if sigmas is None:
-#         sigmas = np.random.uniform(low=0.2, high=1, size=3)
+    # # Blend
+    # if sigmas is None:
+    #     sigmas = np.random.uniform(low=0.2, high=1, size=3)
 
-#     gray_matter_mask = get_gray_matter_mask(parcellation, hemisphere)
-#     resectable_hemisphere_mask = get_resectable_hemisphere_mask(
-#         parcellation, hemisphere, opening_radius=opening_radius)
+    # gray_matter_mask = get_gray_matter_mask(parcellation, hemisphere)
+    # resectable_hemisphere_mask = get_resectable_hemisphere_mask(
+    #     parcellation, hemisphere, opening_radius=opening_radius)
 
-#     resected_brain, resection_mask, _ = _resect(
-#         brain,
-#         gray_matter_mask,
-#         resectable_hemisphere_mask,
-#         noise_image,
-#         radius,
-#         sigmas,
-#     )
-#     write(resected_brain, output_path)
-#     write(resection_mask, resection_mask_output_path)
+    # resected_brain, resection_mask, _ = _resect(
+    #     brain,
+    #     gray_matter_mask,
+    #     resectable_hemisphere_mask,
+    #     noise_image,
+    #     radius,
+    #     sigmas,
+    # )
+    # write(resected_brain, output_path)
+    # write(resection_mask, resection_mask_output_path)
+    return
 
 
 def _resect(
