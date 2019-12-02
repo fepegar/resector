@@ -198,6 +198,8 @@ def mesh_to_volume(poly_data, reference_path):
     nii = nib.load(str(reference_path))
     image_stencil_array = np.ones(nii.shape, dtype=np.uint8)
     image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.get_qform())
+    image_stencil_nii.header['qform_code'] = 1
+    image_stencil_nii.header['sform_code'] = 0
 
     with NamedTemporaryFile(suffix='.nii') as f:
         stencil_path = f.name
