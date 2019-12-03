@@ -4,8 +4,8 @@ import numpy as np
 from math import tau
 import SimpleITK as sitk
 
-from .io import nib_to_sitk
-from .resector import _resect
+from .io import nib_to_sitk, get_sphere_poly_data
+from .resector import resect
 
 
 class Hemisphere(enum.Enum):
@@ -19,7 +19,7 @@ class RandomResection:
             volumes_range=None,
             volumes=None,
             sigmas_range=(0.5, 1),
-            radii_ratio_range=(0.5, 1.5),
+            radii_ratio_range=(0.8, 1.2),
             angles_range=(0, 180),
             delete_keys=True,
             add_bg_to_label=False,
@@ -48,6 +48,7 @@ class RandomResection:
         self.delete_keys = delete_keys
         self.add_bg_to_label = add_bg_to_label
         self.verbose = verbose
+        self.sphere_poly_data = get_sphere_poly_data()
 
     def __call__(self, sample):
         if self.verbose:
@@ -72,7 +73,8 @@ class RandomResection:
             duration = time.time() - start
             print(f'[Prepare resection images]: {duration:.1f} seconds')
 
-        resected_brain, resection_mask, resection_center = _resect(
+        resected_brain, resection_mask, resection_center = resect(
+            self.sphere_poly_data,
             brain,
             gray_matter_mask,
             resectable_hemisphere_mask,
@@ -80,6 +82,7 @@ class RandomResection:
             resection_params['sigmas'],
             resection_params['radii'],
             resection_params['angles'],
+            resection_params['noise_offset'],
             verbose=self.verbose,
         )
         resection_params['resection_center'] = resection_center
@@ -147,12 +150,16 @@ class RandomResection:
         # Rotation angles of the ellipsoid
         angles = torch.FloatTensor(3).uniform_(*angles_range).tolist()
 
+        # Offset for noise
+        noise_offset = torch.randint(1000, (1,)).item()
+
         parameters = dict(
             hemisphere=hemisphere.value,
             volume=volume,
             sigmas=sigmas,
             angles=angles,
             radii=radii,
+            noise_offset=noise_offset,
         )
         return parameters
 

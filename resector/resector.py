@@ -10,7 +10,7 @@ import numpy as np
 import SimpleITK as sitk
 
 from .io import read, write
-from .mesh import get_ellipsoid_poly_data, add_noise_to_poly_data, mesh_to_volume
+from .mesh import get_resection_poly_data, mesh_to_volume
 from .parcellation import (
     get_gray_matter_mask,
     get_resectable_hemisphere_mask,
@@ -19,45 +19,7 @@ from .parcellation import (
 
 
 def resect(
-        input_path,
-        parcellation_path,
-        noise_image_path,
-        output_path,
-        resection_mask_output_path,
-        hemisphere,
-        radius,
-        sigmas=None,
-        opening_radius=None,
-        ):
-    """
-    TODO: fix this?
-    """
-    # brain = read(input_path)
-    # parcellation = read(parcellation_path)
-    # noise_image = read(noise_image_path)
-
-    # # Blend
-    # if sigmas is None:
-    #     sigmas = np.random.uniform(low=0.2, high=1, size=3)
-
-    # gray_matter_mask = get_gray_matter_mask(parcellation, hemisphere)
-    # resectable_hemisphere_mask = get_resectable_hemisphere_mask(
-    #     parcellation, hemisphere, opening_radius=opening_radius)
-
-    # resected_brain, resection_mask, _ = _resect(
-    #     brain,
-    #     gray_matter_mask,
-    #     resectable_hemisphere_mask,
-    #     noise_image,
-    #     radius,
-    #     sigmas,
-    # )
-    # write(resected_brain, output_path)
-    # write(resection_mask, resection_mask_output_path)
-    return
-
-
-def _resect(
+        sphere_poly_data,
         brain,
         gray_matter_mask,
         resectable_hemisphere_mask,
@@ -65,13 +27,16 @@ def _resect(
         sigmas,
         radii,
         angles,
+        noise_offset=None,
         verbose=False,
         ):
     resection_mask, center_ras = get_resection_mask_from_mesh(
+        sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
         radii,
         angles,
+        noise_offset=noise_offset,
         verbose=verbose,
     )
     if verbose:
@@ -84,10 +49,12 @@ def _resect(
 
 
 def get_resection_mask_from_mesh(
+        sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
         radii,
         angles,
+        noise_offset=None,
         verbose=False,
         ):
     """
@@ -102,23 +69,17 @@ def get_resection_mask_from_mesh(
     with NamedTemporaryFile(suffix='.nii') as reference_file:
         reference_path = reference_file.name
 
-        poly_data = get_ellipsoid_poly_data(
+        noisy_poly_data = get_resection_poly_data(
+            sphere_poly_data,
             center_ras,
             radii,
             angles,
+            noise_offset=noise_offset,
         )
-        with warnings.catch_warnings():
-            # To ignore this warning:
-            # https://gitlab.kitware.com/vtk/vtk/merge_requests/4847
-            warnings.simplefilter("ignore")
 
-            # This is the equivalent radius, see RandomResection.get_params
-            radius = radii[0]
-            poly_data = add_noise_to_poly_data(
-                poly_data, radius, verbose=verbose)
-
+        # Use image stencil to convert mesh to image
         write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
-        sphere_mask = mesh_to_volume(poly_data, reference_path)
+        sphere_mask = mesh_to_volume(noisy_poly_data, reference_path)
 
     # Intersection with resectable area
     resection_mask = sitk.And(resectable_hemisphere_mask, sphere_mask)

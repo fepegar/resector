@@ -1,6 +1,7 @@
 import sys
 import time
 import shutil
+import warnings
 from pathlib import Path
 from subprocess import call, DEVNULL
 from tempfile import NamedTemporaryFile
@@ -15,22 +16,76 @@ from noise import pnoise3, snoise3
 from .io import nib_to_sitk
 
 
-def get_ellipsoid_poly_data(center, radii, angles, theta=64, phi=64):
-    """
-    Radii can have length 1 or 3
-    Angles are in degrees
-    """
-    try:
-        iter(radii)
-    except TypeError:
-        radii = 3 * (radii,)
-    sphere_source = vtk.vtkSphereSource()
-    if theta is not None:
-        sphere_source.SetThetaResolution(theta)
-    if phi is not None:
-        sphere_source.SetPhiResolution(phi)
-    sphere_source.Update()
+def get_resection_poly_data(
+        poly_data,
+        center,
+        radii,
+        angles,
+        noise_offset=1000,
+        octaves=4,
+        scale=0.5,
+        deepcopy=True,
+        ):
+    if deepcopy:
+        new_poly_data = vtk.vtkPolyData()
+        new_poly_data.DeepCopy(poly_data)
+        poly_data = new_poly_data
+    poly_data = add_noise_to_sphere(
+        poly_data,
+        octaves=octaves,
+        offset=noise_offset,
+    )
+    poly_data = center_poly_data(poly_data)
+    poly_data = transform_poly_data(poly_data, center, radii, angles)
+    poly_data = compute_normals(poly_data)
+    return poly_data
 
+
+def add_noise_to_sphere(poly_data, octaves, offset=0, scale=0.5):
+    """
+    Expects sphere with radius 1 centered at the origin
+    """
+    wrap_data_object = dsa.WrapDataObject(poly_data)
+    points = wrap_data_object.Points
+    normals = wrap_data_object.PointData['Normals']
+
+    points_with_noise = []
+    for point, normal in zip(points, normals):
+        offset_point = point + offset
+        noise = scale * snoise3(*offset_point, octaves=octaves)
+        point_with_noise = point + noise * normal
+        points_with_noise.append(point_with_noise)
+    points_with_noise = np.array(points_with_noise)
+
+    vertices = vtk.vtkPoints()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        points_with_noise_vtk = numpy_to_vtk(points_with_noise)
+    vertices.SetData(points_with_noise_vtk)
+    poly_data.SetPoints(vertices)
+    return poly_data
+
+
+def center_poly_data(poly_data):
+    centerOfMassFilter = vtk.vtkCenterOfMass()
+    centerOfMassFilter.SetInputData(poly_data)
+    centerOfMassFilter.SetUseScalarsAsWeights(False)
+    centerOfMassFilter.Update()
+    center = np.array(centerOfMassFilter.GetCenter())
+
+    transform = vtk.vtkTransform()
+    transform.Translate(-center)
+
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputData(poly_data)
+    transform_filter.Update()
+
+    poly_data = transform_filter.GetOutput()
+    return poly_data
+
+
+def transform_poly_data(poly_data, center, radii, angles):
     transform = vtk.vtkTransform()
     transform.Translate(center)
     x_angle, y_angle, z_angle = angles  # there must be a better way
@@ -41,93 +96,14 @@ def get_ellipsoid_poly_data(center, radii, angles, theta=64, phi=64):
 
     transform_filter = vtk.vtkTransformPolyDataFilter()
     transform_filter.SetTransform(transform)
-    transform_filter.SetInputConnection(sphere_source.GetOutputPort())
+    transform_filter.SetInputData(poly_data)
     transform_filter.Update()
 
     poly_data = transform_filter.GetOutput()
     return poly_data
 
 
-def get_ellipsoid_poly_data_(
-        center,
-        radius,
-        radii_ratio,
-        angles,
-        ):
-    """
-    Input angles are in degrees
-    """
-    ellipsoid = vtk.vtkParametricEllipsoid()
-    a = radius
-    b = a * radii_ratio
-    c = radius**3 / (a * b)  # a * b * c = r**3
-    ellipsoid.SetXRadius(a)
-    ellipsoid.SetYRadius(b)
-    ellipsoid.SetZRadius(c)
-
-    parametric_source = vtk.vtkParametricFunctionSource()
-    parametric_source.SetParametricFunction(ellipsoid)
-    parametric_source.Update()
-
-    transform = vtk.vtkTransform()
-    transform.Translate(center)
-    x_angle, y_angle, z_angle = angles
-    transform.RotateX(x_angle)
-    transform.RotateY(y_angle)
-    transform.RotateZ(z_angle)
-
-    transform_filter = vtk.vtkTransformPolyDataFilter()
-    transform_filter.SetTransform(transform)
-    transform_filter.SetInputData(parametric_source.GetOutput())
-    transform_filter.Update()
-
-    poly_data = transform_filter.GetOutput()
-    return poly_data
-
-
-def add_noise_to_poly_data(
-        poly_data,
-        radius,
-        noise_type=None,
-        octaves=None,
-        persistence=None,
-        smoothness=None,
-        noise_amplitude_radius_ratio=None,
-        verbose=False,
-    ):
-    if verbose:
-        start = time.time()
-    noise_type = 'perlin' if noise_type is None else noise_type
-    assert noise_type in 'perlin', 'simplex'
-    octaves = 4 if octaves is None else octaves  # make random?
-    persistence = 0.7 if persistence is None else persistence  # make random?
-    smoothness = 10 if smoothness is None else smoothness  # make random?
-    if noise_amplitude_radius_ratio is None:  # make random?
-        noise_amplitude_radius_ratio = 0.5
-
-    wrap_data_object = dsa.WrapDataObject(poly_data)
-    points = wrap_data_object.Points
-    normals = wrap_data_object.PointData['Normals']
-
-    noise_amplitude = radius * noise_amplitude_radius_ratio
-    if noise_type == 'perlin':
-        function = pnoise3
-    elif noise_type == 'simplex':
-        function = snoise3
-
-    points_with_noise = []
-    for point, normal in zip(points, normals):
-        x, y, z = point / smoothness
-        noise = function(x, y, z, octaves=octaves)#, persistence=persistence)  # add random offset?
-        perturbance = noise_amplitude * noise
-        point_with_noise = point + perturbance * normal
-        points_with_noise.append(point_with_noise)
-    points_with_noise = np.array(points_with_noise)
-
-    vertices = vtk.vtkPoints()
-    vertices.SetData(numpy_to_vtk(points_with_noise))
-    poly_data.SetPoints(vertices)
-
+def compute_normals(poly_data):
     normal_filter = vtk.vtkPolyDataNormals()
     normal_filter.AutoOrientNormalsOn()
     normal_filter.SetComputePointNormals(True)
@@ -137,67 +113,32 @@ def add_noise_to_poly_data(
     normal_filter.ConsistencyOn()
     normal_filter.Update()
     poly_data = normal_filter.GetOutput()
-    if verbose:
-        duration = time.time() - start
-        print(f'add_noise_to_poly_data: {duration:.1f} seconds')
     return poly_data
-
-
-def get_slicer_paths(version='4.11'):
-    platform = sys.platform
-    if platform == 'darwin':  # macOS
-        slicer_dir = Path('/Applications/Slicer.app/Contents')
-        slicer_bin_path = slicer_dir / 'MacOS' / 'Slicer'
-    elif platform == 'linux':
-        slicer_dir = Path('~/opt/Slicer/Nightly').expanduser()
-        slicer_bin_path = slicer_dir / 'Slicer'
-    lib_dir = slicer_dir / 'lib' / f'Slicer-{version}'
-    modules_dir = lib_dir / 'cli-modules'
-    module_name = 'ModelToLabelMap'
-    slicer_module_path = modules_dir / module_name
-
-    import os
-    environ_dict = dict(os.environ)
-    if 'LD_LIBRARY_PATH' not in environ_dict:
-        environ_dict['LD_LIBRARY_PATH'] = ''
-    environ_dict['LD_LIBRARY_PATH'] += f':{modules_dir}'
-    environ_dict['LD_LIBRARY_PATH'] += f':{lib_dir}'
-    os.environ.clear()
-    os.environ.update(environ_dict)
-
-    return slicer_bin_path, slicer_module_path
-
-
-def mesh_to_volume_slicer(reference_path, model_path, result_path, verbose=False):
-    # There must be something already in result_path so that
-    # Slicer can load the vtkMRMLVolumeNode? So many ugly hacks :(
-    shutil.copy2(reference_path, result_path)
-    # TODO: check if the previous copy is still needed
-
-    if verbose:
-        start = time.time()
-    _, slicer_module_path = get_slicer_paths()
-    command = (
-        slicer_module_path,
-        reference_path,
-        model_path,
-        result_path,
-    )
-    command = [str(a) for a in command]
-    call(command, stderr=DEVNULL, stdout=DEVNULL)
-    if verbose:
-        duration = time.time() - start
-        print(f'mesh_to_volume: {duration:.1f} seconds')
 
 
 def mesh_to_volume(poly_data, reference_path):
     """
+    ASSUME INPUT IN RAS
     TODO: stop reading and writing so much stuff
     Write to buffer? Bytes? Investigate this
     """
+    def check_header(nifti_image):
+        orientation = ''.join(nib.aff2axcodes(nifti_image.affine))
+        is_ras = orientation == 'RAS'
+        if not is_ras:
+            message = (
+                'RAS orientation expected.'
+                f' Detected orientation: {orientation}'
+            )
+            raise Exception(message)
+        qform_code = nifti_image.header['qform_code']
+        if qform_code == 0:
+            raise Exception(f'qform code for {reference_path} is 0')
+
     nii = nib.load(str(reference_path))
+    check_header(nii)
     image_stencil_array = np.ones(nii.shape, dtype=np.uint8)
-    image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.get_qform())
+    image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.affine)  # nii.get_qform())
     image_stencil_nii.header['qform_code'] = 1
     image_stencil_nii.header['sform_code'] = 0
 
@@ -207,6 +148,7 @@ def mesh_to_volume(poly_data, reference_path):
         image_stencil_reader = vtk.vtkNIFTIImageReader()
         image_stencil_reader.SetFileName(stencil_path)
         image_stencil_reader.Update()
+        pass
 
     image_stencil = image_stencil_reader.GetOutput()
     xyz_to_ijk = image_stencil_reader.GetQFormMatrix()
@@ -242,8 +184,13 @@ def mesh_to_volume(poly_data, reference_path):
 
     data_object = dsa.WrapDataObject(image_output)
     array = data_object.PointData['NIFTI']
-    array = array.reshape(nii.shape, order='F')  # C didn't work :)
+    array = array.reshape(nii.shape, order='F')  # as order='C' didn't work
     array = check_qfac(nii, array)
+
+    num_voxels = array.sum()
+    if num_voxels == 0:
+        import warnings
+        warnings.warn(f'Empty stencil mask for reference {reference_path}')
 
     output_image = nib_to_sitk(array, nii.affine)
     return output_image
@@ -259,10 +206,3 @@ def check_qfac(nifti, array):
     elif qfac == -1:
         array = array[..., ::-1]
     return array
-
-
-def write_poly_data(poly_data, path):
-    writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetInputData(poly_data)
-    writer.SetFileName(path)
-    return writer.Write()
