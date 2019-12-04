@@ -23,6 +23,7 @@ class RandomResection:
             angles_range=(0, 180),
             delete_keys=True,
             add_bg_to_label=False,
+            seed=None,
             verbose=False,
             ):
         """
@@ -47,6 +48,7 @@ class RandomResection:
         self.angles_range = angles_range
         self.delete_keys = delete_keys
         self.add_bg_to_label = add_bg_to_label
+        self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
 
@@ -121,6 +123,7 @@ class RandomResection:
             radii_ratio_range,
             angles_range,
         ):
+        self.check_seed()
         # Hemisphere
         hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
 
@@ -162,6 +165,10 @@ class RandomResection:
             noise_offset=noise_offset,
         )
         return parameters
+
+    def check_seed(self):
+        if self.seed is not None:
+            torch.manual_seed(self.seed)
 
     @staticmethod
     def flip_coin():
