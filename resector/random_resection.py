@@ -53,6 +53,7 @@ class RandomResection:
         self.sphere_poly_data = get_sphere_poly_data()
 
     def __call__(self, sample):
+        self.check_seed()
         if self.verbose:
             import time
             start = time.time()
@@ -123,7 +124,6 @@ class RandomResection:
             radii_ratio_range,
             angles_range,
         ):
-        self.check_seed()
         # Hemisphere
         hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
 
