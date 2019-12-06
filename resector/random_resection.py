@@ -22,7 +22,6 @@ class RandomResection:
             radii_ratio_range=(0.8, 1.2),
             angles_range=(0, 180),
             delete_keys=True,
-            add_bg_to_label=False,
             seed=None,
             verbose=False,
             ):
@@ -47,7 +46,6 @@ class RandomResection:
         self.radii_ratio_range = radii_ratio_range
         self.angles_range = angles_range
         self.delete_keys = delete_keys
-        self.add_bg_to_label = add_bg_to_label
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -92,10 +90,7 @@ class RandomResection:
         resected_brain_array = self.sitk_to_array(resected_brain)
         resected_mask_array = self.sitk_to_array(resection_mask)
         image_resected = self.add_channels_axis(resected_brain_array)
-        if self.add_bg_to_label:
-            resection_label = self.add_background_channel(resected_mask_array)
-        else:
-            resection_label = self.add_channels_axis(resected_mask_array)
+        resection_label = self.add_channels_axis(resected_mask_array)
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
