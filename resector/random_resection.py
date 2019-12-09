@@ -62,14 +62,14 @@ class RandomResection:
             self.radii_ratio_range,
             self.angles_range,
         )
-        brain = nib_to_sitk(sample['image'][0], sample['affine'])
+        brain = nib_to_sitk(sample['image'].squeeze(), sample['affine'])
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
-            sample[f'gray_matter_{hemisphere}'], sample['affine'])
+            sample[f'gray_matter_{hemisphere}'].squeeze(), sample['affine'])
         resectable_hemisphere_mask = nib_to_sitk(
-            sample[f'resectable_{hemisphere}'], sample['affine'])
+            sample[f'resectable_{hemisphere}'].squeeze(), sample['affine'])
         noise_image = nib_to_sitk(
-            sample['noise'], sample['affine'])
+            sample['noise'].squeeze(), sample['affine'])
         if self.verbose:
             duration = time.time() - start
             print(f'[Prepare resection images]: {duration:.1f} seconds')
