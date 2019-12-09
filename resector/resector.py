@@ -48,6 +48,22 @@ def resect(
     return resected_brain, resection_mask, center_ras
 
 
+def sitk_and(image_a, image_b):
+    """
+    Thin wrapper of sitk.And to handle errors more elegantly
+    """
+    image_a_size = image_a.GetSize()
+    image_b_size = image_b.GetSize()
+    if image_a_size != image_b_size:
+        message = (
+            f'Sizes of image_a ({image_a_size}) and image_b ({image_b_size}) do not match'
+        )
+        raise ValueError(message)
+    image_a = sitk.Cast(image_a, sitk.sitkUInt8)
+    image_b = sitk.Cast(image_b, sitk.sitkUInt8)
+    return sitk.And(image_a, image_b)
+
+
 def get_resection_mask_from_mesh(
         sphere_poly_data,
         resectable_hemisphere_mask,
@@ -82,7 +98,7 @@ def get_resection_mask_from_mesh(
         sphere_mask = mesh_to_volume(noisy_poly_data, reference_path)
 
     # Intersection with resectable area
-    resection_mask = sitk.And(resectable_hemisphere_mask, sphere_mask)
+    resection_mask = sitk_and(resectable_hemisphere_mask, sphere_mask)
 
     # Use largest connected component only
     if verbose:
