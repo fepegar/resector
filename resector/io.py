@@ -9,6 +9,25 @@ def read(image_path):
     return sitk.ReadImage(str(image_path))
 
 
+def get_qfac(image_path):
+    from struct import calcsize, unpack
+    from tempfile import NamedTemporaryFile
+    image_path = Path(image_path)
+    with NamedTemporaryFile(suffix='.nii') as f:
+        if image_path.suffix == '.gz':
+            from subprocess import call
+            call('gunzip', '-c', str(image_path), '>', f.name)
+        image_path = f.name
+        with open(image_path, 'rb') as f:
+            fmt = 8 * 'f'
+            size = struct.calcsize(fmt)
+            f.seek(76)
+            chunk = f.read(size)
+    pixdim = struct.unpack(fmt, chunk)
+    qfac = pixdim[0]
+    return qfac
+
+
 def write(image, image_path, set_sform_code_zero=True):
     image_path = str(image_path)
     sitk.WriteImage(image, image_path)
