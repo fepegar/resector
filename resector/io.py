@@ -17,7 +17,9 @@ def read_itk(image_path):
     image_path = str(image_path)
     if CHECK_QFAC:
         check_qfac(image_path)
-    return sitk.ReadImage(image_path)
+    image = sitk.ReadImage(image_path)
+    image += 0  # https://discourse.itk.org/t/simpleitk-writing-nifti-with-invalid-header/2498/4
+    return image
 
 
 def check_qfac(image_path):
@@ -67,7 +69,7 @@ def nib_to_sitk(array, affine):
         nib.Nifti1Image(array, affine).to_filename(f.name)
         if CHECK_QFAC:
             check_qfac(f.name)
-        image = sitk.ReadImage(f.name)
+        image = read(f.name)
     return image
 
 
