@@ -1,36 +1,49 @@
+
+import gzip
+import shutil
+import struct
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import vtk
 import numpy as np
 import nibabel as nib
 import SimpleITK as sitk
 
 
-def read(image_path):
-    return sitk.ReadImage(str(image_path))
+CHECK_QFAC = False
 
 
-def get_qfac(image_path):
-    from struct import calcsize, unpack
-    from tempfile import NamedTemporaryFile
+def read_itk(image_path):
+    image_path = str(image_path)
+    if CHECK_QFAC:
+        check_qfac(image_path)
+    return sitk.ReadImage(image_path)
+
+
+def check_qfac(image_path):
     image_path = Path(image_path)
     with NamedTemporaryFile(suffix='.nii') as f:
         if image_path.suffix == '.gz':
-            from subprocess import call
-            call('gunzip', '-c', str(image_path), '>', f.name)
-        image_path = f.name
+            with gzip.open(image_path, 'rb') as f_in:
+                with open(f.name, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            image_path = f.name
         with open(image_path, 'rb') as f:
             fmt = 8 * 'f'
             size = struct.calcsize(fmt)
             f.seek(76)
             chunk = f.read(size)
-    pixdim = struct.unpack(fmt, chunk)
+            pixdim = struct.unpack(fmt, chunk)
     qfac = pixdim[0]
-    return qfac
+    if qfac not in (-1, 1):
+        raise ValueError(f'qfac is {qfac} in {image_path}')
 
 
 def write(image, image_path, set_sform_code_zero=True):
     image_path = str(image_path)
     sitk.WriteImage(image, image_path)
+    if CHECK_QFAC:
+        check_qfac(image_path)
     if set_sform_code_zero:
         nii = nib.load(image_path)
         data = nii.get_data()
@@ -40,6 +53,8 @@ def write(image, image_path, set_sform_code_zero=True):
         nii.header['qform_code'] = 1
         nii.header['sform_code'] = 0
         nii.to_filename(image_path)
+    if CHECK_QFAC:
+        check_qfac(image_path)
 
 
 def nib_to_sitk(array, affine):
@@ -50,6 +65,8 @@ def nib_to_sitk(array, affine):
     from tempfile import NamedTemporaryFile
     with NamedTemporaryFile(suffix='.nii') as f:
         nib.Nifti1Image(array, affine).to_filename(f.name)
+        if CHECK_QFAC:
+            check_qfac(f.name)
         image = sitk.ReadImage(f.name)
     return image
 
