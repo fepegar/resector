@@ -9,7 +9,7 @@ from tempfile import NamedTemporaryFile
 import numpy as np
 import SimpleITK as sitk
 
-from .io import read, write
+from .io import write
 from .mesh import get_resection_poly_data, mesh_to_volume
 from .parcellation import (
     get_gray_matter_mask,

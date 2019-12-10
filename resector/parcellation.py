@@ -8,7 +8,7 @@ import nibabel as nib
 import SimpleITK as sitk
 from skimage import filters
 
-from .io import read, write, nib_to_sitk
+from .io import write, nib_to_sitk
 
 
 def get_resectable_hemisphere_mask(parcellation_path, hemisphere, opening_radius=3):
