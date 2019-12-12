@@ -69,7 +69,7 @@ def nib_to_sitk(array, affine):
         nib.Nifti1Image(array, affine).to_filename(f.name)
         if CHECK_QFAC:
             check_qfac(f.name)
-        image = read(f.name)
+        image = read_itk(f.name)
     return image
 
 
