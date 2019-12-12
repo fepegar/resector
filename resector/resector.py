@@ -81,7 +81,7 @@ def get_resection_mask_from_mesh(
     center_lps = gray_matter_mask.TransformIndexToPhysicalPoint(
         tuple(voxel_center))
     l, p, s = center_lps
-    center_ras = np.array((-l, -p, s))
+    center_ras = -l, -p, s
     with NamedTemporaryFile(suffix='.nii') as reference_file:
         reference_path = reference_file.name
 
