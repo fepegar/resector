@@ -108,7 +108,7 @@ def get_resection_mask_from_mesh(
         duration = time.time() - start
         print(f'Largest connected component: {duration:.1f} seconds')
 
-    return resection_mask, center_ras
+    return resection_mask, np.array(center_ras)
 
 
 def blend(image, noise_image, mask, sigmas):
