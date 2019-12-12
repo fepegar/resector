@@ -53,6 +53,7 @@ class RandomResection:
     def __call__(self, sample):
         self.check_seed()
         if self.verbose:
+            print('Sample stem for resection:', sample['stem'])
             import time
             start = time.time()
         resection_params = self.get_params(
