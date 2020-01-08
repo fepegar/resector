@@ -78,7 +78,14 @@ def get_sphere_poly_data():
     mesh_path = resources_dir / 'geodesic_polyhedron.vtp'
     if not mesh_path.is_file():
         raise FileNotFoundError(f'{mesh_path} does not exist')
-    return read_poly_data(mesh_path)
+    poly_data = read_poly_data(mesh_path)
+    if poly_data.GetNumberOfPoints() == 0:
+        message = (
+            f'Error reading sphere poly data from {mesh_path}. Contents:'
+            f'\n{mesh_path.read_text()}'
+        )
+        raise FileNotFoundError(message)
+    return poly_data
 
 
 def read_poly_data(path):

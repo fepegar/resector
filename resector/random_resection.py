@@ -53,6 +53,7 @@ class RandomResection:
     def __call__(self, sample):
         self.check_seed()
         if self.verbose:
+            print('Sample stem for resection:', sample['stem'])
             import time
             start = time.time()
         resection_params = self.get_params(
@@ -65,11 +66,17 @@ class RandomResection:
         brain = nib_to_sitk(sample['image'].squeeze(), sample['affine'])
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
-            sample[f'gray_matter_{hemisphere}'].squeeze(), sample['affine'])
+            sample[f'resection_gray_matter_{hemisphere}'].squeeze(),
+            sample['affine'],
+        )
         resectable_hemisphere_mask = nib_to_sitk(
-            sample[f'resectable_{hemisphere}'].squeeze(), sample['affine'])
+            sample[f'resection_resectable_{hemisphere}'].squeeze(),
+            sample['affine'],
+        )
         noise_image = nib_to_sitk(
-            sample['noise'].squeeze(), sample['affine'])
+            sample['resection_noise'].squeeze(),
+            sample['affine'],
+        )
         if self.verbose:
             duration = time.time() - start
             print(f'[Prepare resection images]: {duration:.1f} seconds')
@@ -100,11 +107,11 @@ class RandomResection:
         sample['label'] = resection_label
 
         if self.delete_keys:
-            del sample['gray_matter_left']
-            del sample['gray_matter_right']
-            del sample['resectable_left']
-            del sample['resectable_right']
-            del sample['noise']
+            del sample['resection_gray_matter_left']
+            del sample['resection_gray_matter_right']
+            del sample['resection_resectable_left']
+            del sample['resection_resectable_right']
+            del sample['resection_noise']
 
         if self.verbose:
             duration = time.time() - start
