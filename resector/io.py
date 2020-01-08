@@ -63,8 +63,7 @@ def nib_to_sitk(array, affine):
     """
     This actually seems faster than .parcellation.get_image_from_reference
     """
-    import nibabel as nib
-    from tempfile import NamedTemporaryFile
+    array = array if isinstance(array, np.ndarray) else array.numpy()
     with NamedTemporaryFile(suffix='.nii') as f:
         nib.Nifti1Image(array, affine).to_filename(f.name)
         if CHECK_QFAC:
