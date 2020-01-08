@@ -4,6 +4,8 @@ import numpy as np
 from math import tau
 import SimpleITK as sitk
 
+from torchio import LABEL
+
 from .io import nib_to_sitk, get_sphere_poly_data
 from .resector import resect
 
@@ -53,7 +55,7 @@ class RandomResection:
     def __call__(self, sample):
         self.check_seed()
         if self.verbose:
-            print('Sample stem for resection:', sample['stem'])
+            print('Sample stem for resection:', sample['image']['stem'])
             import time
             start = time.time()
         resection_params = self.get_params(
@@ -63,19 +65,22 @@ class RandomResection:
             self.radii_ratio_range,
             self.angles_range,
         )
-        brain = nib_to_sitk(sample['image'].squeeze(), sample['affine'])
+        brain = nib_to_sitk(
+            sample['image']['data'][0],
+            sample['image']['affine'],
+        )
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
-            sample[f'resection_gray_matter_{hemisphere}'].squeeze(),
-            sample['affine'],
+            sample[f'resection_gray_matter_{hemisphere}']['data'][0],
+            sample[f'resection_gray_matter_{hemisphere}']['affine'],
         )
         resectable_hemisphere_mask = nib_to_sitk(
-            sample[f'resection_resectable_{hemisphere}'].squeeze(),
-            sample['affine'],
+            sample[f'resection_resectable_{hemisphere}']['data'][0],
+            sample[f'resection_resectable_{hemisphere}']['affine'],
         )
         noise_image = nib_to_sitk(
-            sample['resection_noise'].squeeze(),
-            sample['affine'],
+            sample['resection_noise']['data'][0],
+            sample['resection_noise']['affine'],
         )
         if self.verbose:
             duration = time.time() - start
@@ -103,8 +108,14 @@ class RandomResection:
 
         # Update sample
         sample['random_resection'] = resection_params
-        sample['image'] = image_resected
-        sample['label'] = resection_label
+        sample['image']['data'] = torch.from_numpy(image_resected)
+        label_dict = dict(
+            data=torch.from_numpy(resection_label),
+            affine=sample['image']['affine'],
+            stem=sample['image']['stem'],
+            type=LABEL,
+        )
+        sample['label'] = label_dict
 
         if self.delete_keys:
             del sample['resection_gray_matter_left']
