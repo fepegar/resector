@@ -21,7 +21,7 @@ def get_resection_poly_data(
         center,
         radii,
         angles,
-        noise_offset=1000,
+        noise_offset=None,
         octaves=4,
         scale=0.5,
         deepcopy=True,
@@ -30,6 +30,7 @@ def get_resection_poly_data(
         new_poly_data = vtk.vtkPolyData()
         new_poly_data.DeepCopy(poly_data)
         poly_data = new_poly_data
+    noise_offset = 1000 if noise_offset is None else noise_offset
     poly_data = add_noise_to_sphere(
         poly_data,
         octaves=octaves,
