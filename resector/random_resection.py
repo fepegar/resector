@@ -20,10 +20,10 @@ class RandomResection:
             self,
             volumes_range=None,
             volumes=None,
-            sigmas_range=(0.5, 1),
-            radii_ratio_range=(0.8, 1.2),
+            sigmas_range=(0.5, 2),
+            radii_ratio_range=(0.7, 1.3),
             angles_range=(0, 180),
-            delete_keys=True,
+            delete_resection_keys=True,
             seed=None,
             verbose=False,
             ):
@@ -47,7 +47,7 @@ class RandomResection:
         self.sigmas_range = sigmas_range
         self.radii_ratio_range = radii_ratio_range
         self.angles_range = angles_range
-        self.delete_keys = delete_keys
+        self.delete_resection_keys = delete_resection_keys
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -117,7 +117,7 @@ class RandomResection:
         )
         sample['label'] = label_dict
 
-        if self.delete_keys:
+        if self.delete_resection_keys:
             del sample['resection_gray_matter_left']
             del sample['resection_gray_matter_right']
             del sample['resection_resectable_left']
