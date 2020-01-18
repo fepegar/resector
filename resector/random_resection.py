@@ -1,10 +1,11 @@
+import copy
 import enum
 import torch
 import numpy as np
 from math import tau
 import SimpleITK as sitk
 
-from torchio import LABEL
+from torchio import LABEL, DATA
 
 from .io import nib_to_sitk, get_sphere_poly_data
 from .resector import resect
@@ -24,6 +25,7 @@ class RandomResection:
             radii_ratio_range=(0.7, 1.3),
             angles_range=(0, 180),
             delete_resection_keys=True,
+            keep_original=False,
             seed=None,
             verbose=False,
             ):
@@ -48,6 +50,7 @@ class RandomResection:
         self.radii_ratio_range = radii_ratio_range
         self.angles_range = angles_range
         self.delete_resection_keys = delete_resection_keys
+        self.keep_original = keep_original
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -66,20 +69,20 @@ class RandomResection:
             self.angles_range,
         )
         brain = nib_to_sitk(
-            sample['image']['data'][0],
+            sample['image'][DATA][0],
             sample['image']['affine'],
         )
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
-            sample[f'resection_gray_matter_{hemisphere}']['data'][0],
+            sample[f'resection_gray_matter_{hemisphere}'][DATA][0],
             sample[f'resection_gray_matter_{hemisphere}']['affine'],
         )
         resectable_hemisphere_mask = nib_to_sitk(
-            sample[f'resection_resectable_{hemisphere}']['data'][0],
+            sample[f'resection_resectable_{hemisphere}'][DATA][0],
             sample[f'resection_resectable_{hemisphere}']['affine'],
         )
         noise_image = nib_to_sitk(
-            sample['resection_noise']['data'][0],
+            sample['resection_noise'][DATA][0],
             sample['resection_noise']['affine'],
         )
         if self.verbose:
@@ -106,9 +109,19 @@ class RandomResection:
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
-        # Update sample
+        ## Update sample
+        if self.delete_resection_keys:
+            del sample['resection_gray_matter_left']
+            del sample['resection_gray_matter_right']
+            del sample['resection_resectable_left']
+            del sample['resection_resectable_right']
+            del sample['resection_noise']
+
+        # Add resected image and label to sample
         sample['random_resection'] = resection_params
-        sample['image']['data'] = torch.from_numpy(image_resected)
+        if self.keep_original:
+            sample['image_original'] = copy.deepcopy(sample['image'])
+        sample['image'][DATA] = torch.from_numpy(image_resected)
         label_dict = dict(
             data=torch.from_numpy(resection_label),
             affine=sample['image']['affine'],
@@ -116,13 +129,6 @@ class RandomResection:
             type=LABEL,
         )
         sample['label'] = label_dict
-
-        if self.delete_resection_keys:
-            del sample['resection_gray_matter_left']
-            del sample['resection_gray_matter_right']
-            del sample['resection_resectable_left']
-            del sample['resection_resectable_right']
-            del sample['resection_noise']
 
         if self.verbose:
             duration = time.time() - start
