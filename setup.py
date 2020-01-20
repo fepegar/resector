@@ -17,6 +17,7 @@ requirements = [
     'SimpleITK',
     'scikit-image',
     'scipy',
+    'torchio',
     'vtk',
 ]
 

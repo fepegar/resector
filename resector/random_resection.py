@@ -5,15 +5,17 @@ import numpy as np
 from math import tau
 import SimpleITK as sitk
 
-from torchio import LABEL, DATA
+from torchio import LABEL, DATA, AFFINE, IMAGE
 
 from .io import nib_to_sitk, get_sphere_poly_data
 from .resector import resect
 
 
+@enum.unique
 class Hemisphere(enum.Enum):
     LEFT = 'left'
     RIGHT = 'right'
+
 
 
 class RandomResection:
@@ -22,10 +24,11 @@ class RandomResection:
             volumes_range=None,
             volumes=None,
             sigmas_range=(0.5, 2),
-            radii_ratio_range=(0.7, 1.3),
-            angles_range=(0, 180),
+            radii_ratio_range=(1, 2),
+            angles_range=(0, 360),
             delete_resection_keys=True,
             keep_original=False,
+            force_positive=True,
             seed=None,
             verbose=False,
             ):
@@ -34,7 +37,7 @@ class RandomResection:
         volumes is an iterable of possible volumes (they come from EPISURG)
         volumes_range is a range for a uniform distribution (TODO: fit a distribution?)
 
-        Assume there is a single channel in sample['image']
+        Assume there is a key 'image' in sample dict
         Assume there is a key 'resectable_left' in sample dict
         Assume there is a key 'resectable_right' in sample dict
         Assume there is a key 'gray_matter_left' in sample dict
@@ -51,6 +54,7 @@ class RandomResection:
         self.angles_range = angles_range
         self.delete_resection_keys = delete_resection_keys
         self.keep_original = keep_original
+        self.force_positive = force_positive
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -58,7 +62,7 @@ class RandomResection:
     def __call__(self, sample):
         self.check_seed()
         if self.verbose:
-            print('Sample stem for resection:', sample['image']['stem'])
+            print('Sample stem for resection:', sample[IMAGE]['stem'])
             import time
             start = time.time()
         resection_params = self.get_params(
@@ -68,22 +72,33 @@ class RandomResection:
             self.radii_ratio_range,
             self.angles_range,
         )
+        # This makes my life easier for RandomMotion as some MRI have negative
+        # values
+        if self.force_positive:
+            im_dict = sample[IMAGE]
+            min_image_value = sample[IMAGE][DATA].min()
+            if min_image_value < 0:
+                if self.verbose:
+                    print('Forcing positive values on', sample[IMAGE]['stem'])
+                noise_dict = sample['resection_noise']
+                im_dict[DATA] = im_dict[DATA] - min_image_value
+                noise_dict[DATA] = noise_dict[DATA] - min_image_value
         brain = nib_to_sitk(
-            sample['image'][DATA][0],
-            sample['image']['affine'],
+            sample[IMAGE][DATA][0],
+            sample[IMAGE][AFFINE],
         )
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
             sample[f'resection_gray_matter_{hemisphere}'][DATA][0],
-            sample[f'resection_gray_matter_{hemisphere}']['affine'],
+            sample[f'resection_gray_matter_{hemisphere}'][AFFINE],
         )
         resectable_hemisphere_mask = nib_to_sitk(
             sample[f'resection_resectable_{hemisphere}'][DATA][0],
-            sample[f'resection_resectable_{hemisphere}']['affine'],
+            sample[f'resection_resectable_{hemisphere}'][AFFINE],
         )
         noise_image = nib_to_sitk(
             sample['resection_noise'][DATA][0],
-            sample['resection_noise']['affine'],
+            sample['resection_noise'][AFFINE],
         )
         if self.verbose:
             duration = time.time() - start
@@ -120,12 +135,12 @@ class RandomResection:
         # Add resected image and label to sample
         sample['random_resection'] = resection_params
         if self.keep_original:
-            sample['image_original'] = copy.deepcopy(sample['image'])
-        sample['image'][DATA] = torch.from_numpy(image_resected)
+            sample['image_original'] = copy.deepcopy(sample[IMAGE])
+        sample[IMAGE][DATA] = torch.from_numpy(image_resected)
         label_dict = dict(
             data=torch.from_numpy(resection_label),
-            affine=sample['image']['affine'],
-            stem=sample['image']['stem'],
+            affine=sample[IMAGE]['affine'],
+            stem=sample[IMAGE]['stem'],
             type=LABEL,
         )
         sample['label'] = label_dict

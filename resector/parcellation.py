@@ -11,20 +11,27 @@ from skimage import filters
 from .io import write, nib_to_sitk
 
 
-def get_resectable_hemisphere_mask(parcellation_path, hemisphere, opening_radius=3):
+def get_resectable_hemisphere_mask(
+        parcellation_path,
+        hemisphere,
+        opening_radius=3,
+        median_radius=4,
+        ):
+    from .resector import get_largest_connected_component
     assert hemisphere in ('left', 'right')
     parcellation_nii = nib.load(str(parcellation_path))
     array = parcellation_nii.get_data().astype(np.uint8)
     hemisphere_to_remove = 'left' if hemisphere == 'right' else 'right'
+    array[array == 1] = 0  # remove external labels
     array[array == 2] = 0  # remove external labels
     array[array == 3] = 0  # remove external labels
     remove_hemisphere(array, hemisphere_to_remove)
     remove_brainstem_and_cerebellum(array)
-    remove_pattern(array, 'Ventral-DC')  # superior part of the brainstem
     mask = nib_to_sitk(array, parcellation_nii.affine) > 0
-    if opening_radius is not None:
-        mask = sitk.BinaryMorphologicalOpening(
-            mask, opening_radius)
+    mask = sitk.BinaryErode(mask, opening_radius)
+    mask = get_largest_connected_component(mask)
+    mask = sitk.BinaryDilate(mask, opening_radius)
+    mask = sitk.Median(mask, 3 * (median_radius,))
     return mask
 
 
@@ -46,7 +53,6 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
     remove_pattern(array, 'putamen')
     remove_pattern(array, 'pallidum')
     remove_pattern(array, 'thalamus')
-    remove_pattern(array, 'Ventral-DC')
     mask = nib_to_sitk(array, parcellation_nii.affine) > 0
     return mask
 
@@ -84,6 +90,7 @@ def remove_brainstem_and_cerebellum(array):
     remove_pattern(array, 'cerebell')
     remove_pattern(array, 'brain-stem')
     remove_pattern(array, 'pons')
+    remove_pattern(array, 'Ventral-DC')
 
 
 def remove_ventricles(array):

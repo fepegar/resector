@@ -3,7 +3,6 @@
 """Main module."""
 
 import time
-import warnings
 from tempfile import NamedTemporaryFile
 
 import numpy as np
@@ -11,11 +10,7 @@ import SimpleITK as sitk
 
 from .io import write
 from .mesh import get_resection_poly_data, mesh_to_volume
-from .parcellation import (
-    get_gray_matter_mask,
-    get_resectable_hemisphere_mask,
-    get_random_voxel,
-)
+from .parcellation import get_random_voxel
 
 
 def resect(
@@ -92,6 +87,9 @@ def get_resection_mask_from_mesh(
             angles,
             noise_offset=noise_offset,
         )
+
+        from .io import write_poly_data
+        write_poly_data(noisy_poly_data, '/tmp/noisy.vtp')
 
         # Use image stencil to convert mesh to image
         write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
