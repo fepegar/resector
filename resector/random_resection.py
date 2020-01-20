@@ -23,7 +23,7 @@ class RandomResection:
             self,
             volumes_range=None,
             volumes=None,
-            sigmas_range=(0.5, 2),
+            sigmas_range=(0.5, 1),
             radii_ratio_range=(1, 2),
             angles_range=(0, 360),
             delete_resection_keys=True,
@@ -83,7 +83,7 @@ class RandomResection:
                 noise_dict = sample['resection_noise']
                 im_dict[DATA] = im_dict[DATA] - min_image_value
                 noise_dict[DATA] = noise_dict[DATA] - min_image_value
-        brain = nib_to_sitk(
+        t1_pre = nib_to_sitk(
             sample[IMAGE][DATA][0],
             sample[IMAGE][AFFINE],
         )
@@ -106,7 +106,7 @@ class RandomResection:
 
         resected_brain, resection_mask, resection_center = resect(
             self.sphere_poly_data,
-            brain,
+            t1_pre,
             gray_matter_mask,
             resectable_hemisphere_mask,
             noise_image,

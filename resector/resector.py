@@ -88,9 +88,6 @@ def get_resection_mask_from_mesh(
             noise_offset=noise_offset,
         )
 
-        from .io import write_poly_data
-        write_poly_data(noisy_poly_data, '/tmp/noisy.vtp')
-
         # Use image stencil to convert mesh to image
         write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
         sphere_mask = mesh_to_volume(noisy_poly_data, reference_path)
