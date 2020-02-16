@@ -212,10 +212,11 @@ class RandomResection:
         return parameters
 
     def get_resected_structures(self, sample, resection_mask):
-        from utils import AffineMatrix, sglob
+        from pathlib import Path
         from tempfile import NamedTemporaryFile
+        from utils import AffineMatrix, sglob
         from episurg.parcellation import GIFParcellation
-        mni_path = sample[IMAGE]['path']
+        mni_path = Path(sample[IMAGE]['path'])
         mni_dir = mni_path.parent
         dataset_dir = mni_dir.parent
         parcellation_dir = dataset_dir / 'parcellation'
