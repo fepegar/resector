@@ -29,6 +29,7 @@ class RandomResection:
             delete_resection_keys=True,
             keep_original=False,
             force_positive=True,
+            add_params=True,
             seed=None,
             verbose=False,
             ):
@@ -55,6 +56,7 @@ class RandomResection:
         self.delete_resection_keys = delete_resection_keys
         self.keep_original = keep_original
         self.force_positive = force_positive
+        self.add_params = add_params
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -121,6 +123,7 @@ class RandomResection:
         resected_mask_array = self.sitk_to_array(resection_mask)
         image_resected = self.add_channels_axis(resected_brain_array)
         resection_label = self.add_channels_axis(resected_mask_array)
+        resection_label = resection_label.astype(np.float32)
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
@@ -133,7 +136,8 @@ class RandomResection:
             del sample['resection_noise']
 
         # Add resected image and label to sample
-        sample['random_resection'] = resection_params
+        if self.add_params:
+            sample['random_resection'] = resection_params
         if self.keep_original:
             sample['image_original'] = copy.deepcopy(sample[IMAGE])
         sample[IMAGE][DATA] = torch.from_numpy(image_resected)
@@ -142,6 +146,7 @@ class RandomResection:
             affine=sample[IMAGE]['affine'],
             stem=sample[IMAGE]['stem'],
             type=LABEL,
+            path='',
         )
         sample['label'] = label_dict
 
