@@ -30,6 +30,7 @@ class RandomResection:
             keep_original=False,
             force_positive=True,
             add_params=True,
+            add_resected_structures=False,
             seed=None,
             verbose=False,
             ):
@@ -57,6 +58,7 @@ class RandomResection:
         self.keep_original = keep_original
         self.force_positive = force_positive
         self.add_params = add_params
+        self.add_resected_structures = add_resected_structures
         self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
@@ -150,6 +152,10 @@ class RandomResection:
         )
         sample['label'] = label_dict
 
+        if self.add_resected_structures:
+            sample['resected_structures'] = self.get_resected_structures(
+                sample, resection_mask)
+
         if self.verbose:
             duration = time.time() - start
             print(f'RandomResection: {duration:.1f} seconds')
@@ -204,6 +210,37 @@ class RandomResection:
             noise_offset=noise_offset,
         )
         return parameters
+
+    def get_resected_structures(self, sample, resection_mask):
+        from utils import AffineMatrix, sglob
+        from tempfile import NamedTemporaryFile
+        from episurg.parcellation import GIFParcellation
+        mni_path = sample[IMAGE]['path']
+        mni_dir = mni_path.parent
+        dataset_dir = mni_dir.parent
+        parcellation_dir = dataset_dir / 'parcellation'
+        stem = mni_path.name.split('_t1_pre')[0]
+        transform_path = sglob(mni_dir, f'{stem}*.txt')
+        parcellation_path = sglob(parcellation_dir, f'{stem}*.nii.gz')
+        transform = AffineMatrix(transform_path).get_itk_transform()
+        parcellation = sitk.ReadImage(str(parcellation_path))
+        resampled = sitk.Resample(
+            parcellation,
+            resection_mask,
+            transform,
+            sitk.sitkNearestNeighbor,
+        )
+        with NamedTemporaryFile(suffix='.nii') as p:
+            with NamedTemporaryFile(suffix='.nii') as m:
+                parcellation_path = p.name
+                mask_path = m.name
+                sitk.WriteImage(resampled, parcellation_path)
+                sitk.WriteImage(resection_mask, mask_path)
+                parcellation = GIFParcellation(parcellation_path)
+                resected_structures = parcellation.get_resected_ratios(
+                    mask_path)
+        return resected_structures
+
 
     def check_seed(self):
         if self.seed is not None:
