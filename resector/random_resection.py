@@ -221,8 +221,8 @@ class RandomResection:
         dataset_dir = mni_dir.parent
         parcellation_dir = dataset_dir / 'parcellation'
         stem = mni_path.name.split('_t1_pre')[0]
-        transform_path = sglob(mni_dir, f'{stem}*.txt')
-        parcellation_path = sglob(parcellation_dir, f'{stem}*.nii.gz')
+        transform_path = sglob(mni_dir, f'{stem}*.txt')[0]
+        parcellation_path = sglob(parcellation_dir, f'{stem}*.nii.gz')[0]
         transform = AffineMatrix(transform_path).get_itk_transform()
         parcellation = sitk.ReadImage(str(parcellation_path))
         resampled = sitk.Resample(
