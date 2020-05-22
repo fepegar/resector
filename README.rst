@@ -1,6 +1,6 @@
-========
-resector
-========
+============
+``resector``
+============
 
 Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
 used to simulate a resection cavity from a T1-weighted brain MRI and a
@@ -16,7 +16,7 @@ F. Pérez-García, R. Rodionov, A. Alim-Marvasti, R. Sparks, J. Duncan and S. Ou
 Installation
 ------------
 
-.. highlight:: shell
+.. code-block::
 
     $ git clone https://github.com/fepegar/resector.git
     $ pip install --editable ./resector
@@ -24,9 +24,9 @@ Installation
 Usage
 -----
 
-.. highlight:: shell
+.. code-block::
 
     $ resect t1.nii.gz gif_parcellation.nii.gz t1_resected.nii.gz t1_resection_label.nii.gz
 
 
-Run `resect --help` for more options.
+Run ``resect --help`` for more options.
