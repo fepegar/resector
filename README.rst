@@ -2,40 +2,31 @@
 resector
 ========
 
+Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
+used to simulate a resection cavity from a T1-weighted brain MRI and a
+corresponding brain parcellation.
 
-.. image:: https://img.shields.io/pypi/v/resector.svg
-        :target: https://pypi.python.org/pypi/resector
+Accepted at the
+Medical Image Computing and Computer Assisted Intervention (MICCAI) 2020 conference:
 
-.. image:: https://img.shields.io/travis/fepegar/resector.svg
-        :target: https://travis-ci.org/fepegar/resector
-
-.. image:: https://readthedocs.org/projects/resector/badge/?version=latest
-        :target: https://resector.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
-
-
-.. image:: https://pyup.io/repos/github/fepegar/resector/shield.svg
-     :target: https://pyup.io/repos/github/fepegar/resector/
-     :alt: Updates
+F. Pérez-García, R. Rodionov, A. Alim-Marvasti, R. Sparks, J. Duncan and S. Ourselin.
+*Simulation of Brain Resection for Cavity Segmentation Using Self-Supervised and Semi-Supervised Learning*
 
 
+Installation
+------------
 
-Algorithm to simulate resections osurgery on brain MRI scans.
+.. highlight:: shell
+
+    $ git clone https://github.com/fepegar/resector.git
+    $ pip install --editable ./resector
+
+Usage
+-----
+
+.. highlight:: shell
+
+    $ resect t1.nii.gz gif_parcellation.nii.gz t1_resected.nii.gz t1_resection_label.nii.gz
 
 
-* Free software: MIT license
-* Documentation: https://resector.readthedocs.io.
-
-
-Features
---------
-
-* TODO
-
-Credits
--------
-
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+Run `resect --help` for more options.
