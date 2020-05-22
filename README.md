@@ -1,5 +1,10 @@
 # `resector`
 
+<p align="center">
+    <img src="https://raw.githubusercontent.com/fepegar/resector/master/docs/images/60_examples_resized_50.gif"
+        alt="Resections">
+</p>
+
 Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
 used to simulate a resection cavity from a T1-weighted brain MRI and a
 corresponding brain parcellation.
