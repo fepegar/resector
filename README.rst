@@ -2,7 +2,7 @@
 ``resector``
 ============
 
-Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
+Implementation of a `TorchIO <https://torchio.readthedocs.io/>`_ transform
 used to simulate a resection cavity from a T1-weighted brain MRI and a
 corresponding brain parcellation.
 
