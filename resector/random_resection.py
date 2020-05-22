@@ -40,11 +40,11 @@ class RandomResection:
         volumes_range is a range for a uniform distribution (TODO: fit a distribution?)
 
         Assume there is a key 'image' in sample dict
-        Assume there is a key 'resectable_left' in sample dict
-        Assume there is a key 'resectable_right' in sample dict
-        Assume there is a key 'gray_matter_left' in sample dict
-        Assume there is a key 'gray_matter_right' in sample dict
-        Assume there is a key 'noise' in sample dict
+        Assume there is a key 'resection_resectable_left' in sample dict
+        Assume there is a key 'resection_resectable_right' in sample dict
+        Assume there is a key 'resection_gray_matter_left' in sample dict
+        Assume there is a key 'resection_gray_matter_right' in sample dict
+        Assume there is a key 'resection_noise' in sample dict
         """
         if (volumes is None and volumes_range is None
                 or volumes is not None and volumes_range is not None):
