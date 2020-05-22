@@ -13,6 +13,7 @@ from pathlib import Path
 @click.argument('output-label-path', type=click.Path())
 @click.option('--min-volume', '-miv', type=int, default=50, show_default=True)
 @click.option('--max-volume', '-mav', type=int, default=5000, show_default=True)
+@click.option('--volumes_path', '-v', type=click.Path(exists=True))
 def main(
         input_path,
         parcellation_path,
@@ -20,6 +21,7 @@ def main(
         output_label_path,
         min_volume,
         max_volume,
+        volumes_path,
         ):
     """Console script for resector."""
     import torchio
@@ -54,9 +56,17 @@ def main(
             noise_path,
         )
 
+    if volumes_path is not None:
+        import pandas as pd
+        df = pd.read_csv(volumes_path)
+        volumes = df.Volume.values
+        kwargs = dict(volumes=volumes)
+    else:
+        kwargs = dict(volumes_range=(min_volume, max_volume))
+
     transform = torchio.Compose((
         torchio.ToCanonical(),
-        resector.RandomResection(volumes_range=(min_volume, max_volume)),
+        resector.RandomResection(**kwargs),
     ))
     subject = torchio.Subject(
         image=torchio.Image(input_path, torchio.INTENSITY),
