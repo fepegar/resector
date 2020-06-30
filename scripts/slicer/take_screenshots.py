@@ -12,14 +12,14 @@ def jump(r, a, s):
         sliceLogic.SetSliceOffset(offset)
 
 
-images_dir = Path('/tmp/resector/repo')
+images_dir = Path('/tmp/resector/patient')
 screenshots_dir = Path('/tmp/screenshots')
 screenshots_dir.mkdir(exist_ok=True)
 
 slicer.mrmlScene.Clear(0)
 
-volumeNode = loadVolume(str(images_dir / 't1_cropped.nii.gz'))
-labelNode = loadLabelVolume(str(images_dir / 't1_seg_gif_cropped.nii.gz'))
+volumeNode = loadVolume(str(images_dir / '0713_t1_pre_on_mni.nii.gz.nii.gz'))
+labelNode = loadLabelVolume(str(images_dir / '0713_t1_pre_NeuroMorph_Parcellation.nii.gz'))
 loadGIFColorTable()
 colorNode = getNode('BrainAnatomyLabelsV3_0')
 displayNode = labelNode.GetDisplayNode()
@@ -28,18 +28,20 @@ displayNode.SetAndObserveColorNodeID(colorNode.GetID())
 logic = ScreenCaptureLogic()
 logic.showViewControllers(False)
 
-jump(-2.68, 7.3, 9.2)
+# jump(-2.68, 7.3, 9.2)
 
 setSliceViewerLayers(background=volumeNode, label=None)
+slicer.app.processEvents()
 logic.captureImageFromView(None, str(screenshots_dir / 'initial_mri.png'))
 
 setSliceViewerLayers(background=None, label=labelNode)
+slicer.app.processEvents()
 logic.captureImageFromView(None, str(screenshots_dir / 'initial_gif.png'))
 
 
 
 
-for i in range(1, 61):
+for i in range(10, 61):
     slicer.mrmlScene.Clear(0)
     seg_path, mri_path = sorted(list(images_dir.glob(f'*_{i}.nii.gz')))
     print(seg_path)
@@ -60,11 +62,13 @@ for i in range(1, 61):
     displayNode = segNode.GetDisplayNode()
     displayNode.SetVisibility(False)
     screenshot_path = screenshots_dir / mri_path.name.replace('.nii.gz', '_resected.png')
+    slicer.app.processEvents()
     logic.captureImageFromView(None, str(screenshot_path))
     print()
 
-
 logic.showViewControllers(True)
+
+
 
 
 # Outside slicer
