@@ -148,7 +148,7 @@ class RandomResection:
             tensor=resection_label,
             affine=sample[IMAGE]['affine'],
         )
-        sample.add_image(label)
+        sample.add_image(label, 'label')
 
         if self.add_resected_structures:
             sample['resected_structures'] = self.get_resected_structures(
