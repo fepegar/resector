@@ -77,8 +77,8 @@ def main(
         resection_noise=torchio.Image(noise_path, type=None),
     )
     transformed = transform(subject)
-    transformed.image.save(output_image_path)
-    transformed.label.save(output_label_path)
+    transformed['image'].save(output_image_path)
+    transformed['label'].save(output_label_path)
     return 0
 
 
