@@ -74,7 +74,7 @@ def main(
         resection_resectable_right=torchio.LabelMap(resectable_paths[1]),
         resection_gray_matter_left=torchio.LabelMap(gm_paths[0]),
         resection_gray_matter_right=torchio.LabelMap(gm_paths[1]),
-        resection_noise=torchio.Image(noise_path, type=None),
+        resection_noise=torchio.ScalarImage(noise_path),
     )
     transformed = transform(subject)
     transformed['image'].save(output_image_path)
