@@ -69,20 +69,16 @@ def main(
         resector.RandomResection(**kwargs),
     ))
     subject = torchio.Subject(
-        image=torchio.Image(input_path, torchio.INTENSITY),
-        resection_resectable_left=torchio.Image(resectable_paths[0], torchio.LABEL),
-        resection_resectable_right=torchio.Image(resectable_paths[1], torchio.LABEL),
-        resection_gray_matter_left=torchio.Image(gm_paths[0], torchio.LABEL),
-        resection_gray_matter_right=torchio.Image(gm_paths[1], torchio.LABEL),
-        resection_noise=torchio.Image(noise_path, None),
+        image=torchio.ScalarImage(input_path),
+        resection_resectable_left=torchio.LabelMap(resectable_paths[0]),
+        resection_resectable_right=torchio.LabelMap(resectable_paths[1]),
+        resection_gray_matter_left=torchio.LabelMap(gm_paths[0]),
+        resection_gray_matter_right=torchio.LabelMap(gm_paths[1]),
+        resection_noise=torchio.Image(noise_path, type=None),
     )
-    dataset = torchio.ImagesDataset([subject], transform=transform)
-    resected = dataset[0]
-    dataset.save_sample(
-        resected,
-        dict(image=output_image_path, label=output_label_path),
-    )
-
+    transformed = transform(subject)
+    transformed.image.save(output_image_path)
+    transformed.label.save(output_label_path)
     return 0
 
 
