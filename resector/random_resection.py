@@ -5,6 +5,7 @@ import numpy as np
 from math import tau
 import SimpleITK as sitk
 
+import torchio as tio
 from torchio import LABEL, DATA, AFFINE, IMAGE
 
 from .io import nib_to_sitk, get_sphere_poly_data
@@ -143,14 +144,11 @@ class RandomResection:
         if self.keep_original:
             sample['image_original'] = copy.deepcopy(sample[IMAGE])
         sample[IMAGE][DATA] = torch.from_numpy(image_resected)
-        label_dict = dict(
-            data=torch.from_numpy(resection_label),
+        label = tio.LabelMap(
+            tensor=resection_label,
             affine=sample[IMAGE]['affine'],
-            stem=sample[IMAGE]['stem'],
-            type=LABEL,
-            path='',
         )
-        sample['label'] = label_dict
+        sample.add_image(label)
 
         if self.add_resected_structures:
             sample['resected_structures'] = self.get_resected_structures(
