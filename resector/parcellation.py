@@ -28,9 +28,9 @@ def get_resectable_hemisphere_mask(
     remove_hemisphere(array, hemisphere_to_remove)
     remove_brainstem_and_cerebellum(array)
     mask = nib_to_sitk(array, parcellation_nii.affine) > 0
-    mask = sitk.BinaryErode(mask, opening_radius)
+    mask = sitk.BinaryErode(mask, 3 * [opening_radius])
     mask = get_largest_connected_component(mask)
-    mask = sitk.BinaryDilate(mask, opening_radius)
+    mask = sitk.BinaryDilate(mask, 3 * [opening_radius])
     mask = sitk.Median(mask, 3 * (median_radius,))
     return mask
 
@@ -78,7 +78,7 @@ def get_csf_mask(parcellation_path, erode_radius=1) -> sitk.Image:
     csf_mask_array = (parcellation_array > 0).astype(np.uint8)
     csf_mask = nib_to_sitk(csf_mask_array, parcellation_nii.affine)
     if erode_radius is not None:
-        csf_mask = sitk.BinaryErode(csf_mask, erode_radius)
+        csf_mask = sitk.BinaryErode(csf_mask, 3 * [erode_radius])
     return csf_mask
 
 
