@@ -82,14 +82,6 @@ def main(
     return 0
 
 
-
-        # Assume there is a key 'image' in sample dict
-        # Assume there is a key 'resectable_left' in sample dict
-        # Assume there is a key 'resectable_right' in sample dict
-        # Assume there is a key 'gray_matter_left' in sample dict
-        # Assume there is a key 'gray_matter_right' in sample dict
-        # Assume there is a key 'noise' in sample dict
-
 if __name__ == "__main__":
     # pylint: disable=no-value-for-parameter
     sys.exit(main())  # pragma: no cover
