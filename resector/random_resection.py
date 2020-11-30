@@ -64,10 +64,10 @@ class RandomResection:
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
 
-    def __call__(self, sample):
+    def __call__(self, subject):
         self.check_seed()
         if self.verbose:
-            print('Sample stem for resection:', sample[IMAGE]['stem'])
+            print('Sample stem for resection:', subject[IMAGE]['stem'])
             import time
             start = time.time()
         resection_params = self.get_params(
@@ -80,30 +80,30 @@ class RandomResection:
         # This makes my life easier for RandomMotion as some MRI have negative
         # values
         if self.force_positive:
-            im_dict = sample[IMAGE]
-            min_image_value = sample[IMAGE][DATA].min()
+            im_dict = subject[IMAGE]
+            min_image_value = subject[IMAGE][DATA].min()
             if min_image_value < 0:
                 if self.verbose:
-                    print('Forcing positive values on', sample[IMAGE]['stem'])
-                noise_dict = sample['resection_noise']
+                    print('Forcing positive values on', subject[IMAGE]['stem'])
+                noise_dict = subject['resection_noise']
                 im_dict[DATA] = im_dict[DATA] - min_image_value
                 noise_dict[DATA] = noise_dict[DATA] - min_image_value
         t1_pre = nib_to_sitk(
-            sample[IMAGE][DATA][0],
-            sample[IMAGE][AFFINE],
+            subject[IMAGE][DATA][0],
+            subject[IMAGE][AFFINE],
         )
         hemisphere = resection_params['hemisphere']
         gray_matter_mask = nib_to_sitk(
-            sample[f'resection_gray_matter_{hemisphere}'][DATA][0],
-            sample[f'resection_gray_matter_{hemisphere}'][AFFINE],
+            subject[f'resection_gray_matter_{hemisphere}'][DATA][0],
+            subject[f'resection_gray_matter_{hemisphere}'][AFFINE],
         )
         resectable_hemisphere_mask = nib_to_sitk(
-            sample[f'resection_resectable_{hemisphere}'][DATA][0],
-            sample[f'resection_resectable_{hemisphere}'][AFFINE],
+            subject[f'resection_resectable_{hemisphere}'][DATA][0],
+            subject[f'resection_resectable_{hemisphere}'][AFFINE],
         )
         noise_image = nib_to_sitk(
-            sample['resection_noise'][DATA][0],
-            sample['resection_noise'][AFFINE],
+            subject['resection_noise'][DATA][0],
+            subject['resection_noise'][AFFINE],
         )
         if self.verbose:
             duration = time.time() - start
@@ -130,34 +130,34 @@ class RandomResection:
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
-        ## Update sample
+        ## Update subject
         if self.delete_resection_keys:
-            del sample['resection_gray_matter_left']
-            del sample['resection_gray_matter_right']
-            del sample['resection_resectable_left']
-            del sample['resection_resectable_right']
-            del sample['resection_noise']
+            del subject['resection_gray_matter_left']
+            del subject['resection_gray_matter_right']
+            del subject['resection_resectable_left']
+            del subject['resection_resectable_right']
+            del subject['resection_noise']
 
-        # Add resected image and label to sample
+        # Add resected image and label to subject
         if self.add_params:
-            sample['random_resection'] = resection_params
+            subject['random_resection'] = resection_params
         if self.keep_original:
-            sample['image_original'] = copy.deepcopy(sample[IMAGE])
-        sample[IMAGE][DATA] = torch.from_numpy(image_resected)
+            subject['image_original'] = copy.deepcopy(subject[IMAGE])
+        subject[IMAGE][DATA] = torch.from_numpy(image_resected)
         label = tio.LabelMap(
             tensor=resection_label,
-            affine=sample[IMAGE]['affine'],
+            affine=subject[IMAGE]['affine'],
         )
-        sample.add_image(label, 'label')
+        subject.add_image(label, 'label')
 
         if self.add_resected_structures:
-            sample['resected_structures'] = self.get_resected_structures(
-                sample, resection_mask)
+            subject['resected_structures'] = self.get_resected_structures(
+                subject, resection_mask)
 
         if self.verbose:
             duration = time.time() - start
             print(f'RandomResection: {duration:.1f} seconds')
-        return sample
+        return subject
 
     @staticmethod
     def get_params(
