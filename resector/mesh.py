@@ -8,7 +8,7 @@ import numpy as np
 import nibabel as nib
 from noise import snoise3
 
-from .io import nib_to_sitk
+from .io import nib_to_sitk, write
 
 
 def get_resection_poly_data(
@@ -84,10 +84,10 @@ def center_poly_data(poly_data):
     return poly_data
 
 
-def transform_poly_data(poly_data, center, radii, angles):
+def transform_poly_data(poly_data, center, radii, degrees):
     transform = vtk.vtkTransform()
     transform.Translate(center)
-    x_angle, y_angle, z_angle = angles  # there must be a better way
+    x_angle, y_angle, z_angle = degrees  # there must be a better way
     transform.RotateX(x_angle)
     transform.RotateY(y_angle)
     transform.RotateZ(z_angle)
@@ -115,7 +115,17 @@ def compute_normals(poly_data):
     return poly_data
 
 
-def mesh_to_volume(poly_data, reference_path):
+def mesh_to_volume(poly_data, reference):
+    with NamedTemporaryFile(suffix='.nii') as reference_file:
+        reference_path = reference_file.name
+
+        # Use image stencil to convert mesh to image
+        write(reference, reference_path)  # TODO: use an existing image
+        sphere_mask = _mesh_to_volume(poly_data, reference_path)
+    return sphere_mask
+
+
+def _mesh_to_volume(poly_data, reference_path):
     """
     ASSUME INPUT IN RAS
     TODO: stop reading and writing so much stuff
@@ -202,3 +212,17 @@ def check_qfac(nifti, array):
     elif qfac == -1:
         array = array[..., ::-1]
     return array
+
+
+def flipxy(poly_data):
+    transform = vtk.vtkTransform()
+    # transform.RotateZ(np.pi)
+    transform.RotateZ(180)
+
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputData(poly_data)
+    transform_filter.Update()
+
+    poly_data = transform_filter.GetOutput()
+    return poly_data
