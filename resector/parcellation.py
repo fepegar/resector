@@ -124,19 +124,43 @@ def get_image_from_reference(array, reference):
     return image
 
 
-def make_noise_image(image_path, parcellation_path, output_path, threshold=True):
+def get_mean_std_threshold(csf_values, threshold, std_factor):
+    if threshold:  # remove non-CSF voxels
+        otsu = filters.threshold_otsu(csf_values)
+        csf_values = csf_values[csf_values < otsu]
+    # assume normal distribution
+    mean = csf_values.mean()
+    std = csf_values.std() * std_factor  # this is because many bright voxels are still included in CSF mask
+    return mean, std
+
+
+def get_mean_std_histogram(csf_values, num_bins):
+    count, levels = np.histogram(csf_values, 32)
+    max_count_idx = np.argmax(count)
+    level_1 = levels[max_count_idx]
+    level_2 = levels[max_count_idx + 1]
+    mean = np.mean((level_1, level_2))
+    std = csf_values[csf_values < mean].std()
+    return mean, std
+
+
+def make_noise_image(
+        image_path,
+        parcellation_path,
+        output_path,
+        threshold=True,
+        std_factor=0.25,
+        ):
     image_nii = nib.load(str(image_path))
     csf_mask = get_csf_mask(parcellation_path)
     image_array = image_nii.get_data()
     csf_mask_array = sitk.GetArrayViewFromImage(csf_mask) > 0  # to bool needed
     csf_mask_array = csf_mask_array.transpose(2, 1, 0)  # sitk to np
     csf_values = image_array[csf_mask_array]
-    if threshold:  # remove non-CSF voxels
-        otsu = filters.threshold_otsu(csf_values)
-        csf_values = csf_values[csf_values < otsu]
-    # assume normal distribution
+    # mean, std = get_mean_std_threshold(csf_values, threshold, std_factor)
+    mean, std = get_mean_std_histogram(csf_values, 32)
     noise_tensor = torch.FloatTensor(*image_array.shape)
-    noise_tensor = noise_tensor.normal_(csf_values.mean(), csf_values.std())
+    noise_tensor = noise_tensor.normal_(mean, std)
     noise_image = nib_to_sitk(noise_tensor.numpy(), image_nii.affine)
     write(noise_image, output_path)
 

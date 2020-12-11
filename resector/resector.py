@@ -23,7 +23,7 @@ def resect(
         noise_offset=None,
         verbose=False,
         ):
-    resection_mask, center_ras = get_resection_mask_from_mesh(
+    resection_mask, center_ras = plan_noisy_ellipsoid(
         sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
@@ -63,9 +63,6 @@ def plan_ellipsoid(
         angles,
         sphere_poly_data,
     )
-    from .io import write_poly_data
-    from .mesh import flipxy
-    write_poly_data(flipxy(ellipsoid_poly_data), '/tmp/ellipsoid.vtp')
     ellipsoid = mesh_to_volume(ellipsoid_poly_data, gray_matter_mask)
     return sitk_and(ellipsoid, resectable_hemisphere_mask)
 
@@ -128,7 +125,7 @@ def set_metadata(image: sitk.Image, reference: sitk.Image):
     image.SetOrigin(reference.GetOrigin())
 
 
-def get_resection_mask_from_mesh(
+def plan_noisy_ellipsoid(
         sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
