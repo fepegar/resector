@@ -51,7 +51,7 @@ def main(
     center = np.array(output_size) / 2
     maxd = np.linalg.norm(center)
     for i in trange(si):
-        for j in trange(sj, leave=False):
+        for j in range(sj):
             for k in range(sk):
                 p = np.array((i, j, k))
                 d = get_distance(p, center)

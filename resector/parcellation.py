@@ -9,6 +9,7 @@ import SimpleITK as sitk
 from skimage import filters
 
 from .io import write, nib_to_sitk
+from .image import get_largest_connected_component
 
 
 def get_resectable_hemisphere_mask(
@@ -17,7 +18,6 @@ def get_resectable_hemisphere_mask(
         opening_radius=3,
         median_radius=4,
         ):
-    from .resector import get_largest_connected_component
     assert hemisphere in ('left', 'right')
     parcellation_nii = nib.load(str(parcellation_path))
     array = parcellation_nii.get_data().astype(np.uint8)
@@ -163,22 +163,3 @@ def make_noise_image(
     noise_tensor = noise_tensor.normal_(mean, std)
     noise_image = nib_to_sitk(noise_tensor.numpy(), image_nii.affine)
     write(noise_image, output_path)
-
-
-def get_random_voxel(mask, border=False, verbose=False):
-    if verbose:
-        start = time.time()
-    if border:
-        image = sitk.BinaryContour(mask)
-    else:
-        image = mask
-    array = sitk.GetArrayViewFromImage(image)
-    coords = np.array(np.where(array)).T  # N x 3
-    N = len(coords)
-    random_index = torch.randint(N, (1,)).item()
-    coords_voxel = coords[random_index]
-    coords_voxel = [int(n) for n in reversed(coords_voxel)]  # NumPy vs ITK
-    if verbose:
-        duration = time.time() - start
-        print(f'get_random_voxel: {duration:.1f} seconds')
-    return coords_voxel
