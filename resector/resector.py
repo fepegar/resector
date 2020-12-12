@@ -3,21 +3,19 @@
 """Main module."""
 
 import time
-from tempfile import NamedTemporaryFile
 
 import torch
 import numpy as np
 import nibabel as nib
 import SimpleITK as sitk
 
-from .io import write
 from .mesh import get_resection_poly_data, mesh_to_volume
 from .parcellation import get_random_voxel
 
 
 def resect(
         sphere_poly_data,
-        brain,
+        image,
         gray_matter_mask,
         resectable_hemisphere_mask,
         noise_image,
@@ -28,7 +26,7 @@ def resect(
         simplex_path=None,
         verbose=False,
         ):
-    resection_mask, center_ras = get_resection_mask_from_mesh(
+    resection_mask, center_ras = plan_noisy_ellipsoid(
         sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
@@ -39,8 +37,8 @@ def resect(
     )
     if verbose:
         start = time.time()
-    resected_brain = blend(
-        brain,
+    resected_image = blend(
+        image,
         noise_image,
         resection_mask,
         sigmas,
@@ -49,7 +47,68 @@ def resect(
     if verbose:
         duration = time.time() - start
         print(f'Blending: {duration:.1f} seconds')
-    return resected_brain, sitk.Cast(resection_mask, sitk.sitkUInt8), center_ras
+    return resected_image, resection_mask, center_ras
+
+
+def plan_cuboid(
+        gray_matter_mask,
+        resectable_hemisphere_mask,
+        radii_world,
+        ):
+    cuboid = get_cuboid_image(radii_world, gray_matter_mask)
+    return sitk_and(cuboid, resectable_hemisphere_mask)
+
+
+def plan_ellipsoid(
+        gray_matter_mask,
+        resectable_hemisphere_mask,
+        radii_world,
+        angles,
+        sphere_poly_data,
+        ):
+    ellipsoid_poly_data = get_ellipsoid_poly_data(
+        radii_world,
+        gray_matter_mask,
+        angles,
+        sphere_poly_data,
+    )
+    ellipsoid = mesh_to_volume(ellipsoid_poly_data, gray_matter_mask)
+    return sitk_and(ellipsoid, resectable_hemisphere_mask)
+
+
+def get_cuboid_image(radii_world, gray_matter_mask):
+    center_voxel = np.array(get_random_voxel(gray_matter_mask))
+    spacing = np.array(gray_matter_mask.GetSpacing())
+    radii_voxel = np.array(radii_world) / spacing
+    radii_voxel = radii_voxel.round().astype(np.uint16)
+    axes_voxel = 2 * radii_voxel
+    cuboid = sitk.Image(*axes_voxel.tolist(), sitk.sitkUInt8) + 1
+    result = gray_matter_mask * 0
+    destination = (center_voxel - radii_voxel).tolist()
+    paste = sitk.PasteImageFilter()
+    paste.SetDestinationIndex(destination)
+    paste.SetSourceSize(cuboid.GetSize())
+    result = paste.Execute(result, cuboid)
+    return result
+
+
+def get_ellipsoid_poly_data(
+        radii_world,
+        gray_matter_mask,
+        angles,
+        sphere_poly_data,
+        ):
+    from .mesh import transform_poly_data
+    center_voxel = np.array(get_random_voxel(gray_matter_mask))
+    l, p, s = gray_matter_mask.TransformIndexToPhysicalPoint(center_voxel.tolist())
+    center_ras = -l, -p, s
+    ellipsoid = transform_poly_data(
+        sphere_poly_data,
+        center_ras,
+        radii_world,
+        angles,
+    )
+    return ellipsoid
 
 
 def sitk_and(image_a, image_b):
@@ -68,7 +127,14 @@ def sitk_and(image_a, image_b):
     return sitk.And(image_a, image_b)
 
 
-def get_resection_mask_from_mesh(
+def set_metadata(image: sitk.Image, reference: sitk.Image):
+    assert image.GetSize() == reference.GetSize()
+    image.SetDirection(reference.GetDirection())
+    image.SetSpacing(reference.GetSpacing())
+    image.SetOrigin(reference.GetOrigin())
+
+
+def plan_noisy_ellipsoid(
         sphere_poly_data,
         resectable_hemisphere_mask,
         gray_matter_mask,
@@ -86,20 +152,16 @@ def get_resection_mask_from_mesh(
         tuple(voxel_center))
     l, p, s = center_lps
     center_ras = -l, -p, s
-    with NamedTemporaryFile(suffix='.nii') as reference_file:
-        reference_path = reference_file.name
 
-        noisy_poly_data = get_resection_poly_data(
-            sphere_poly_data,
-            center_ras,
-            radii,
-            angles,
-            noise_offset=noise_offset,
-        )
+    noisy_poly_data = get_resection_poly_data(
+        sphere_poly_data,
+        center_ras,
+        radii,
+        angles,
+        noise_offset=noise_offset,
+    )
 
-        # Use image stencil to convert mesh to image
-        write(resectable_hemisphere_mask, reference_path)  # TODO: use an existing image
-        sphere_mask = mesh_to_volume(noisy_poly_data, reference_path)
+    sphere_mask = mesh_to_volume(noisy_poly_data, resectable_hemisphere_mask)
 
     # Intersection with resectable area
     resection_mask = sitk_and(resectable_hemisphere_mask, sphere_mask)

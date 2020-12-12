@@ -32,6 +32,9 @@ class RandomResection:
             add_params=True,
             add_resected_structures=False,
             simplex_path=None,
+            shape=None,
+            texture=None,
+            seed=None,
             verbose=False,
             ):
         """
@@ -61,6 +64,8 @@ class RandomResection:
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
         self.simplex_path = simplex_path
+        self.shape = shape
+        self.texture = texture
 
     def __call__(self, subject):
         if self.verbose:
@@ -146,8 +151,8 @@ class RandomResection:
             print(f'RandomResection: {duration:.1f} seconds')
         return subject
 
-    @staticmethod
     def get_params(
+            self,
             volumes,
             volumes_range,
             sigmas_range,
@@ -155,7 +160,7 @@ class RandomResection:
             angles_range,
         ):
         # Hemisphere
-        hemisphere = Hemisphere.LEFT if RandomResection.flip_coin() else Hemisphere.RIGHT
+        hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
 
         # Equivalent sphere volume
         if volumes is None:
