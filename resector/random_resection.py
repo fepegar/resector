@@ -29,10 +29,9 @@ class RandomResection:
             angles_range=(0, 360),
             delete_resection_keys=True,
             keep_original=False,
-            force_positive=True,
             add_params=True,
             add_resected_structures=False,
-            seed=None,
+            simplex_path=None,
             verbose=False,
             ):
         """
@@ -57,15 +56,13 @@ class RandomResection:
         self.angles_range = angles_range
         self.delete_resection_keys = delete_resection_keys
         self.keep_original = keep_original
-        self.force_positive = force_positive
         self.add_params = add_params
         self.add_resected_structures = add_resected_structures
-        self.seed = seed
         self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
+        self.simplex_path = simplex_path
 
     def __call__(self, subject):
-        self.check_seed()
         if self.verbose:
             print('Sample stem for resection:', subject[IMAGE]['stem'])
             import time
@@ -77,17 +74,6 @@ class RandomResection:
             self.radii_ratio_range,
             self.angles_range,
         )
-        # This makes my life easier for RandomMotion as some MRI have negative
-        # values
-        if self.force_positive:
-            im_dict = subject[IMAGE]
-            min_image_value = subject[IMAGE][DATA].min()
-            if min_image_value < 0:
-                if self.verbose:
-                    print('Forcing positive values on', subject[IMAGE]['stem'])
-                noise_dict = subject['resection_noise']
-                im_dict[DATA] = im_dict[DATA] - min_image_value
-                noise_dict[DATA] = noise_dict[DATA] - min_image_value
         t1_pre = nib_to_sitk(
             subject[IMAGE][DATA][0],
             subject[IMAGE][AFFINE],
@@ -119,6 +105,7 @@ class RandomResection:
             resection_params['radii'],
             resection_params['angles'],
             resection_params['noise_offset'],
+            simplex_path=self.simplex_path,
             verbose=self.verbose,
         )
         resection_params['resection_center'] = resection_center
@@ -239,11 +226,6 @@ class RandomResection:
                 resected_structures = parcellation.get_resected_ratios(
                     mask_path)
         return resected_structures
-
-
-    def check_seed(self):
-        if self.seed is not None:
-            torch.manual_seed(self.seed)
 
     @staticmethod
     def flip_coin():

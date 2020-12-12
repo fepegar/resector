@@ -45,7 +45,8 @@ setup(
     description="Algorithm to simulate resections osurgery on brain MRI scans.",
     entry_points={
         'console_scripts': [
-            'resect=resector.cli:main',
+            'resect=resector.cli.resect:main',
+            'create-noise-volume=resector.cli.create_noise_volume:main',
         ],
     },
     install_requires=requirements,

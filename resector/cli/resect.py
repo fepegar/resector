@@ -13,7 +13,8 @@ from pathlib import Path
 @click.argument('output-label-path', type=click.Path())
 @click.option('--min-volume', '-miv', type=int, default=50, show_default=True)
 @click.option('--max-volume', '-mav', type=int, default=5000, show_default=True)
-@click.option('--volumes_path', '-v', type=click.Path(exists=True))
+@click.option('--volumes-path', '-v', type=click.Path(exists=True))
+@click.option('--simplex-path', '-s', type=click.Path(exists=True))
 def main(
         input_path,
         parcellation_path,
@@ -22,6 +23,7 @@ def main(
         min_volume,
         max_volume,
         volumes_path,
+        simplex_path,
         ):
     """Console script for resector."""
     import torchio
@@ -63,6 +65,7 @@ def main(
         kwargs = dict(volumes=volumes)
     else:
         kwargs = dict(volumes_range=(min_volume, max_volume))
+    kwargs['simplex_path'] = simplex_path
 
     transform = torchio.Compose((
         torchio.ToCanonical(),
