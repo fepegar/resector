@@ -11,15 +11,17 @@ from pathlib import Path
 @click.argument('parcellation-path', type=click.Path(exists=True))
 @click.argument('output-image-path', type=click.Path())
 @click.argument('output-label-path', type=click.Path())
+@click.option('--seed', '-s', type=int)
 @click.option('--min-volume', '-miv', type=int, default=50, show_default=True)
 @click.option('--max-volume', '-mav', type=int, default=5000, show_default=True)
 @click.option('--volumes-path', '-v', type=click.Path(exists=True))
-@click.option('--simplex-path', '-s', type=click.Path(exists=True))
+@click.option('--simplex-path', '-n', type=click.Path(exists=True))
 def main(
         input_path,
         parcellation_path,
         output_image_path,
         output_label_path,
+        seed,
         min_volume,
         max_volume,
         volumes_path,
@@ -32,6 +34,10 @@ def main(
     input_path = Path(input_path)
     output_dir = input_path.parent
     stem = input_path.name.split('.nii')[0]  # assume it's a .nii file
+
+    if seed is not None:
+        import torch
+        torch.manual_seed(seed)
 
     gm_paths = []
     resectable_paths = []
