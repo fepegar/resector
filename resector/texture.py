@@ -11,14 +11,14 @@ def sample_simplex_noise(
         reference,
         size,
         gamma=4,
-        persistence_index=2,
+        # persistence_index=2,
         ):
     # Gamma expansion
     # This is so that bright artifacts do not happen everywhere
     nii = nib.load(simplex_path)
     ci, cj, ck = crop_shape = np.array(size)[::-1]  # sitk to np
     max_shape = np.array(nii.shape) - crop_shape
-    persistence_index /= persistence_index  # use values near the border, with higher persistence
+    # persistence_index /= persistence_index  # use values near the border, with higher persistence
     mi, mj, mk = max_shape.round().astype(int).tolist()
     i_ini = torch.randint(0, mi, (1,)).item()
     j_ini = torch.randint(0, mj, (1,)).item()
