@@ -94,7 +94,10 @@ def read_poly_data(path):
     return reader.GetOutput()
 
 
-def write_poly_data(poly_data, path):
+def write_poly_data(poly_data, path, flip=False):
+    if flip:
+        from .mesh import flipxy
+        poly_data = flipxy(poly_data)
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetInputData(poly_data)
     writer.SetFileName(str(path))

@@ -32,6 +32,7 @@ class RandomResection:
             add_params=True,
             add_resected_structures=False,
             simplex_path=None,
+            wm_lesion=False,
             shape=None,
             texture=None,
             seed=None,
@@ -66,6 +67,7 @@ class RandomResection:
         self.simplex_path = simplex_path
         self.shape = shape
         self.texture = texture
+        self.wm_lesion = wm_lesion
 
     def __call__(self, subject):
         if self.verbose:
@@ -110,6 +112,7 @@ class RandomResection:
             angles=resection_params['angles'],
             noise_offset=resection_params['noise_offset'],
             sphere_poly_data=self.sphere_poly_data,
+            wm_lesion=self.wm_lesion,
             simplex_path=self.simplex_path,
             verbose=self.verbose,
         )

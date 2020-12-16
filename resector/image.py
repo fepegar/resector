@@ -16,8 +16,14 @@ def get_bounding_box(label_image, pad=0):
     f.Execute(sitk.Cast(label_image, sitk.sitkUInt8))
     bb = np.array(f.GetBoundingBox(1))
     ini, size = bb[:3], bb[3:]
+    fin = ini + size
     ini -= pad
-    size += 2 * pad
+    fin += pad
+    image_size = np.array(label_image.GetSize())
+    ini[ini < 0] = 0
+    for i in range(3):
+        fin[i] = min(fin[i], image_size[i])
+    size = fin - ini
     return ini.tolist() + size.tolist()
 
 
@@ -95,3 +101,7 @@ def get_cuboid_image(radii_world, reference: sitk.Image, center_ras):
     paste.SetSourceSize(cuboid.GetSize())
     result = paste.Execute(result, cuboid)
     return result
+
+
+def not_empty(image):
+    return sitk.GetArrayViewFromImage(image).sum() > 0

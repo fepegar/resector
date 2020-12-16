@@ -14,9 +14,11 @@ from pathlib import Path
 @click.option('--seed', '-s', type=int)
 @click.option('--min-volume', '-miv', type=int, default=50, show_default=True)
 @click.option('--max-volume', '-mav', type=int, default=5000, show_default=True)
-@click.option('--volumes-path', '-v', type=click.Path(exists=True))
+@click.option('--volumes-path', '-p', type=click.Path(exists=True))
 @click.option('--simplex-path', '-n', type=click.Path(exists=True))
 @click.option('--std-blur', type=float)
+@click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False)
+@click.option('--verbose/--no-verbose', '-v', type=bool, default=False)
 def main(
         input_path,
         parcellation_path,
@@ -28,6 +30,8 @@ def main(
         volumes_path,
         simplex_path,
         std_blur,
+        wm_lesion,
+        verbose,
         ):
     """Console script for resector."""
     import torchio
@@ -76,6 +80,8 @@ def main(
     if std_blur is not None:
         kwargs['sigmas_range'] = std_blur, std_blur
     kwargs['simplex_path'] = simplex_path
+    kwargs['wm_lesion'] = wm_lesion
+    kwargs['verbose'] = verbose
 
     transform = torchio.Compose((
         torchio.ToCanonical(),

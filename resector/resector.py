@@ -1,16 +1,18 @@
 import time
 
-from .texture import blend
+from .texture import blend, clean_outside_resectable
 from .mesh import (
     get_resection_poly_data,
     get_ellipsoid_poly_data,
     mesh_to_volume,
+    scale_poly_data,
 )
 from .image import (
     get_largest_connected_component,
     sitk_and,
     get_random_voxel_ras,
     get_cuboid_image,
+    not_empty,
 )
 
 
@@ -23,17 +25,16 @@ def resect(
         radii,
         shape=None,
         angles=None,
-        sigmas_white_matter=None,
-        scale_white_matter=None,
+        sigma_white_matter=10,
+        scale_white_matter=3,
+        wm_lesion=False,
         sphere_poly_data=None,
         noise_offset=None,
         simplex_path=None,
         verbose=False,
         ):
-
+    original_image = image
     center_ras = get_random_voxel_ras(gray_matter_mask)
-
-    shape = 'ellipsoid'
 
     if shape is None:
         # Get normal resection
@@ -45,15 +46,32 @@ def resect(
             sphere_poly_data=sphere_poly_data,
             verbose=verbose,
         )
-        if sigmas_white_matter is not None:
+        if wm_lesion:
             wm_lesion_poly_data = scale_poly_data(
-                resection_poly_data,
+                noisy_poly_data,
                 scale_white_matter,
+                center_ras,
             )
 
-            wm_lesion_mask = None
+            wm_lesion_mask = mesh_to_volume(
+                wm_lesion_poly_data,
+                resectable_hemisphere_mask,
+            )
+            wm_sigmas = 3 * (sigma_white_matter,)
+            image = blend(
+                image,
+                noise_image,
+                wm_lesion_mask,
+                wm_sigmas,
+                pad=20,
+            )
 
-            wm_lesion_image = None
+            image = clean_outside_resectable(
+                original_image,
+                image,
+                resectable_hemisphere_mask,
+                gray_matter_mask,
+            )
 
         raw_resection_mask = mesh_to_volume(
             noisy_poly_data,
@@ -78,6 +96,7 @@ def resect(
         )
 
     resection_mask = sitk_and(raw_resection_mask, resectable_hemisphere_mask)
+    assert not_empty(resection_mask), 'Masked resection label is empty'
 
     if shape is None:  # noisy sphere can generate multiple components?
         # Use largest connected component only
@@ -90,6 +109,8 @@ def resect(
 
     if verbose:
         start = time.time()
+    resected_image = image
+
     resected_image = blend(
         image,
         noise_image,
@@ -97,6 +118,7 @@ def resect(
         sigmas,
         simplex_path=simplex_path,
     )
+
     if verbose:
         duration = time.time() - start
         print(f'Blending: {duration:.1f} seconds')

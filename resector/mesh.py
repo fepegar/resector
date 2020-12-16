@@ -123,6 +123,37 @@ def transform_poly_data(poly_data, center, radii, degrees):
     return poly_data
 
 
+def get_center(poly_data):
+    f = vtk.vtkCenterOfMass()
+    f.SetInputData(poly_data)
+    f.Update()
+    return f.GetCenter()
+
+
+def scale_poly_data(poly_data, scale, center_ras):
+    goToOrigin = vtk.vtkTransform()
+    goToOrigin.Translate(tuple(-n for n in center_ras))  # terrible
+
+    comeFromOrigin = vtk.vtkTransform()
+    comeFromOrigin.Translate(center_ras)
+
+    scaleTransform = vtk.vtkTransform()
+    scaleTransform.Scale(3 * (scale,))
+
+    transform = goToOrigin
+    transform.PostMultiply()
+    transform.Concatenate(scaleTransform.GetMatrix())
+    transform.Concatenate(comeFromOrigin.GetMatrix())
+
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputData(poly_data)
+    transform_filter.Update()
+
+    poly_data = transform_filter.GetOutput()
+    return poly_data
+
+
 def compute_normals(poly_data):
     normal_filter = vtk.vtkPolyDataNormals()
     normal_filter.AutoOrientNormalsOn()

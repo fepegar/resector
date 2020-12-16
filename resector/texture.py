@@ -90,3 +90,19 @@ def blend(
     f.SetSourceSize(bounding_box[3:])
     image_resected = f.Execute(image, sub_image_resected)
     return image_resected
+
+
+def clean_outside_resectable(
+        image,
+        resected_image,
+        resectable_hemisphere_mask,
+        gray_matter_mask,
+        ):
+    mask = sitk.Xor(resectable_hemisphere_mask, gray_matter_mask)
+    clean_resected = blend(
+        image,
+        resected_image,
+        mask,
+        (1, 1, 1),
+    )
+    return clean_resected
