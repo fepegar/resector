@@ -28,6 +28,7 @@ def resect(
         sigma_white_matter=10,
         scale_white_matter=3,
         wm_lesion=False,
+        clot=False,
         sphere_poly_data=None,
         noise_offset=None,
         simplex_path=None,
@@ -119,8 +120,6 @@ def resect(
 
     if verbose:
         start = time.time()
-    resected_image = image
-
     resected_image = blend(
         image,
         noise_image,
@@ -128,9 +127,20 @@ def resect(
         sigmas,
         simplex_path=simplex_path,
     )
-
     if verbose:
         duration = time.time() - start
         print(f'Blending: {duration:.1f} seconds')
+
+    if clot:
+        center_clot_ras = get_random_voxel_ras(resection_mask)
+        clot_radii = [n / 5 for n in radii]
+        clot_poly_data = get_resection_poly_data(
+            center_clot_ras,
+            clot_radii,
+            angles,
+            noise_offset=noise_offset * 2,
+            sphere_poly_data=sphere_poly_data,
+            verbose=verbose,
+        )
 
     return resected_image, resection_mask, center_ras
