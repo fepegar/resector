@@ -121,7 +121,6 @@ class RandomResection:
         resected_mask_array = self.sitk_to_array(resection_mask)
         image_resected = self.add_channels_axis(resected_brain_array)
         resection_label = self.add_channels_axis(resected_mask_array)
-        resection_label = resection_label.astype(np.float32)
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 

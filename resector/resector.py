@@ -38,6 +38,8 @@ def resect(
 
     if shape is None:
         # Get normal resection
+        if verbose:
+            start = time.time()
         noisy_poly_data = get_resection_poly_data(
             center_ras,
             radii,
@@ -46,7 +48,12 @@ def resect(
             sphere_poly_data=sphere_poly_data,
             verbose=verbose,
         )
+        if verbose:
+            duration = time.time() - start
+            print(f'Noisy mesh: {duration:.1f} seconds')
         if wm_lesion:
+            if verbose:
+                start = time.time()
             wm_lesion_poly_data = scale_poly_data(
                 noisy_poly_data,
                 scale_white_matter,
@@ -72,6 +79,9 @@ def resect(
                 resectable_hemisphere_mask,
                 gray_matter_mask,
             )
+            if verbose:
+                duration = time.time() - start
+                print(f'White matter lesion: {duration:.1f} seconds')
 
         raw_resection_mask = mesh_to_volume(
             noisy_poly_data,
