@@ -33,9 +33,7 @@ def get_subvolume(image, bounding_box):
 
 def set_metadata(image: sitk.Image, reference: sitk.Image):
     assert image.GetSize() == reference.GetSize()
-    image.SetDirection(reference.GetDirection())
-    image.SetSpacing(reference.GetSpacing())
-    image.SetOrigin(reference.GetOrigin())
+    image.CopyInformation(reference)
 
 
 def sitk_and(image_a, image_b):
@@ -71,3 +69,29 @@ def get_random_voxel(mask, border=False, verbose=False):
         duration = time.time() - start
         print(f'get_random_voxel: {duration:.1f} seconds')
     return coords_voxel
+
+
+def get_random_voxel_ras(mask):
+    voxel = get_random_voxel(mask)
+    center_lps = mask.TransformIndexToPhysicalPoint(tuple(voxel))
+    l, p, s = center_lps
+    center_ras = -l, -p, s
+    return center_ras
+
+
+def get_cuboid_image(radii_world, reference: sitk.Image, center_ras):
+    r, a, s = center_ras
+    center_lps = -r, -a, s
+    center_voxel = reference.TransformPhysicalPointToIndex(center_lps)
+    spacing = np.array(reference.GetSpacing())
+    radii_voxel = np.array(radii_world) / spacing
+    radii_voxel = radii_voxel.round().astype(np.uint16)
+    axes_voxel = 2 * radii_voxel
+    cuboid = sitk.Image(*axes_voxel.tolist(), sitk.sitkUInt8) + 1
+    result = reference * 0
+    destination = (center_voxel - radii_voxel).tolist()
+    paste = sitk.PasteImageFilter()
+    paste.SetDestinationIndex(destination)
+    paste.SetSourceSize(cuboid.GetSize())
+    result = paste.Execute(result, cuboid)
+    return result

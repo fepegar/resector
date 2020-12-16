@@ -101,15 +101,15 @@ class RandomResection:
             print(f'[Prepare resection images]: {duration:.1f} seconds')
 
         resected_brain, resection_mask, resection_center = resect(
-            self.sphere_poly_data,
             t1_pre,
             gray_matter_mask,
             resectable_hemisphere_mask,
             noise_image,
             resection_params['sigmas'],
             resection_params['radii'],
-            resection_params['angles'],
-            resection_params['noise_offset'],
+            angles=resection_params['angles'],
+            noise_offset=resection_params['noise_offset'],
+            sphere_poly_data=self.sphere_poly_data,
             simplex_path=self.simplex_path,
             verbose=self.verbose,
         )

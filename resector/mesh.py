@@ -8,12 +8,11 @@ import numpy as np
 import nibabel as nib
 from noise import snoise3
 
-from .io import nib_to_sitk, write
+from .io import nib_to_sitk, write, get_sphere_poly_data
 
 
 def get_resection_poly_data(
-        poly_data,
-        center,
+        center_ras,
         radii,
         angles,
         noise_offset=1000,
@@ -21,10 +20,14 @@ def get_resection_poly_data(
         scale=1,
         deepcopy=True,
         smoothness=3,
+        sphere_poly_data=None,
+        verbose=False,
         ):
+    if sphere_poly_data is None:
+        sphere_poly_data = get_sphere_poly_data()
     if deepcopy:
         new_poly_data = vtk.vtkPolyData()
-        new_poly_data.DeepCopy(poly_data)
+        new_poly_data.DeepCopy(sphere_poly_data)
         poly_data = new_poly_data
     poly_data = add_noise_to_sphere(
         poly_data,
@@ -34,9 +37,27 @@ def get_resection_poly_data(
         smoothness=smoothness,
     )
     poly_data = center_poly_data(poly_data)
-    poly_data = transform_poly_data(poly_data, center, radii, angles)
+    poly_data = transform_poly_data(poly_data, center_ras, radii, angles)
     poly_data = compute_normals(poly_data)
     return poly_data
+
+
+def get_ellipsoid_poly_data(
+        radii_world,
+        center_ras,
+        angles,
+        sphere_poly_data=None,
+        ):
+    from .mesh import transform_poly_data
+    if sphere_poly_data is None:
+        sphere_poly_data = get_sphere_poly_data()
+    ellipsoid = transform_poly_data(
+        sphere_poly_data,
+        center_ras,
+        radii_world,
+        angles,
+    )
+    return ellipsoid
 
 
 def add_noise_to_sphere(poly_data, octaves, offset, scale, smoothness):

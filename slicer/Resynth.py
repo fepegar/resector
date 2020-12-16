@@ -182,7 +182,6 @@ class ResynthLogic(ScriptedLoadableModuleLogic):
     )
 
     resected_brain, resection_mask, resection_center = resect(
-      get_sphere_poly_data(),
       brain,
       gray_matter_mask,
       resectable_hemisphere_mask,
