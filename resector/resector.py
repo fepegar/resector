@@ -1,9 +1,5 @@
-import time
-
-import torch
-import numpy as np
 import SimpleITK as sitk
-from .texture import blend, add_wm_lesion, get_bright_noise
+from .texture import blend, add_wm_lesion, add_clot
 from .mesh import (
     get_resection_poly_data,
     get_ellipsoid_poly_data,
@@ -16,6 +12,7 @@ from .image import (
     get_cuboid_image,
     not_empty,
 )
+from .timer import timer
 
 
 def resect(
@@ -33,6 +30,7 @@ def resect(
         clot=False,
         clot_erosion_radius=1,
         clot_size_ratio=(1.5, 3),
+        clot_percentiles=(90, 99),
         sphere_poly_data=None,
         noise_offset=None,
         simplex_path=None,
@@ -44,124 +42,93 @@ def resect(
     center_ras = get_random_voxel_ras(gray_matter_mask)
 
     if shape is None:
-        # Get normal resection
-        if verbose:
-            start = time.time()
-        noisy_poly_data = get_resection_poly_data(
-            center_ras,
-            radii,
-            angles,
-            noise_offset=noise_offset,
-            sphere_poly_data=sphere_poly_data,
-            verbose=verbose,
-        )
-        if verbose:
-            duration = time.time() - start
-            print(f'Noisy mesh: {duration:.1f} seconds')
-
-        raw_resection_mask = mesh_to_volume(
-            noisy_poly_data,
-            resectable_hemisphere_mask,
-        )
-
-        if wm_lesion:
-            image = add_wm_lesion(
-                image,
-                original_image,
-                noise_image,
-                noisy_poly_data,
-                scale_white_matter,
+        with timer('Noisy mesh', verbose):
+            noisy_poly_data = get_resection_poly_data(
                 center_ras,
-                resectable_hemisphere_mask,
-                gray_matter_mask,
-                3 * (sigma_white_matter,),
-                pad=20,
+                radii,
+                angles,
+                noise_offset=noise_offset,
+                sphere_poly_data=sphere_poly_data,
                 verbose=verbose,
             )
 
-    elif shape == 'cuboid':
-        raw_resection_mask = get_cuboid_image(
-            radii,
-            gray_matter_mask,
-            center_ras,
-        )
-    elif shape == 'ellipsoid':
-        poly_data = get_ellipsoid_poly_data(
-            radii,
-            center_ras,
-            angles,
-            sphere_poly_data=sphere_poly_data,
-        )
-        raw_resection_mask = mesh_to_volume(
-            poly_data,
-            resectable_hemisphere_mask,
-        )
+        with timer('mesh to volume', verbose):
+            raw_resection_mask = mesh_to_volume(
+                noisy_poly_data,
+                resectable_hemisphere_mask,
+            )
 
-    resection_mask = sitk_and(raw_resection_mask, resectable_hemisphere_mask)
+        if wm_lesion:
+            with timer('white matter lesion', verbose):
+                image = add_wm_lesion(
+                    image,
+                    original_image,
+                    noise_image,
+                    noisy_poly_data,
+                    scale_white_matter,
+                    center_ras,
+                    resectable_hemisphere_mask,
+                    gray_matter_mask,
+                    3 * (sigma_white_matter,),
+                    pad=20,
+                    verbose=verbose,
+                )
+    elif shape == 'cuboid':
+        with timer('cuboid image', verbose):
+            raw_resection_mask = get_cuboid_image(
+                radii,
+                gray_matter_mask,
+                center_ras,
+            )
+    elif shape == 'ellipsoid':
+        with timer('ellipsoid', verbose):
+            poly_data = get_ellipsoid_poly_data(
+                radii,
+                center_ras,
+                angles,
+                sphere_poly_data=sphere_poly_data,
+            )
+            raw_resection_mask = mesh_to_volume(
+                poly_data,
+                resectable_hemisphere_mask,
+            )
+
+    with timer('intersection with resectable', verbose):
+        resection_mask = sitk_and(
+            raw_resection_mask, resectable_hemisphere_mask)
     assert not_empty(resection_mask), 'Masked resection label is empty'
 
     if shape is None:  # noisy sphere can generate multiple components?
         # Use largest connected component only
-        if verbose:
-            start = time.time()
-        resection_mask = get_largest_connected_component(resection_mask)
-        if verbose:
-            duration = time.time() - start
-            print(f'Largest connected component: {duration:.1f} seconds')
+        with timer('largest connected component', verbose):
+            resection_mask = get_largest_connected_component(resection_mask)
 
-    if verbose:
-        start = time.time()
-    resected_image = blend(
-        image,
-        noise_image,
-        resection_mask,
-        sigmas,
-        simplex_path=simplex_path,
-    )
-    if verbose:
-        duration = time.time() - start
-        print(f'Blending: {duration:.1f} seconds')
-
-    center_clot_ras = None
-    if clot:
-        if verbose:
-            start = time.time()
-        eroded_resection_mask = sitk.BinaryErode(
-            resection_mask,
-            3 * [clot_erosion_radius],
-        )
-        center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
-        radii = np.array(radii)
-        clot_size_ratios = torch.FloatTensor(3).uniform_(*clot_size_ratio).numpy()
-        clot_radii = radii / clot_size_ratios
-        clot_poly_data = get_resection_poly_data(
-            center_clot_ras,
-            clot_radii,
-            angles,
-            noise_offset=noise_offset * 2,
-            sphere_poly_data=sphere_poly_data,
-            verbose=verbose,
-        )
-        raw_clot_mask = mesh_to_volume(
-            clot_poly_data,
-            resectable_hemisphere_mask,
-        )
-
-        clot_mask = sitk_and(raw_clot_mask, eroded_resection_mask)
-        bright_noise_image = get_bright_noise(
-            original_image,
-            noise_image,
-            (90, 99),
-        )
+    with timer('blending', verbose):
         resected_image = blend(
-            resected_image,
-            bright_noise_image,
-            clot_mask,
+            image,
+            noise_image,
+            resection_mask,
             sigmas,
             simplex_path=simplex_path,
         )
-        if verbose:
-            duration = time.time() - start
-            print(f'Clot: {duration:.1f} seconds')
+
+    center_clot_ras = None
+    if clot:
+        with timer('clot', verbose):
+            resected_image, center_clot_ras = add_clot(
+                original_image,
+                resected_image,
+                noise_image,
+                resection_mask,
+                clot_erosion_radius,
+                radii,
+                clot_size_ratio,
+                angles,
+                noise_offset,
+                sphere_poly_data,
+                clot_percentiles,
+                sigmas,
+                verbose=verbose,
+            )
 
     return resected_image, resection_mask, center_ras, center_clot_ras

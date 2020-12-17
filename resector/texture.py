@@ -1,12 +1,16 @@
-import time
-
 import torch
 import numpy as np
 import nibabel as nib
 import SimpleITK as sitk
 
-from .mesh import scale_poly_data, mesh_to_volume
-from .image import get_subvolume, get_bounding_box
+from .timer import timer
+from .image import (
+    get_subvolume,
+    get_bounding_box,
+    get_random_voxel_ras,
+    sitk_and,
+)
+from .mesh import scale_poly_data, mesh_to_volume, get_resection_poly_data
 
 
 def sample_simplex_noise(
@@ -21,7 +25,8 @@ def sample_simplex_noise(
     nii = nib.load(simplex_path)
     ci, cj, ck = crop_shape = np.array(size)[::-1]  # sitk to np
     max_shape = np.array(nii.shape) - crop_shape
-    # persistence_index /= persistence_index  # use values near the border, with higher persistence
+    # use values near the border, with higher persistence
+    # persistence_index /= persistence_index
     mi, mj, mk = max_shape.round().astype(int).tolist()
     i_ini = torch.randint(0, mi, (1,)).item()
     j_ini = torch.randint(0, mj, (1,)).item()
@@ -118,10 +123,11 @@ def clean_outside_resectable(
     )
     return clean_resected
 
+
 def get_bright_noise(image, csf_noise, percentiles):
     """
-    Create noise image with same std as input noise image and random mean within
-    the foregound values of input image
+    Create noise image with same std as input noise image and random mean
+    within certain percentiles values of input image
     """
     image_array = sitk.GetArrayViewFromImage(image)
     csf_mean = sitk.GetArrayViewFromImage(csf_noise).mean()
@@ -145,36 +151,71 @@ def add_wm_lesion(
         pad,
         verbose=False,
         ):
-    if verbose:
-        start = time.time()
-
-    wm_lesion_poly_data = scale_poly_data(
-        poly_data,
-        scale_factor,
-        center_ras,
-    )
-
-    wm_lesion_mask = mesh_to_volume(
-        wm_lesion_poly_data,
-        resectable_mask,
-    )
-
-    image = blend(
-        image,
-        csf_noise_image,
-        wm_lesion_mask,
-        sigmas,
-        pad=pad,
-    )
-
+    wm_lesion_poly_data = scale_poly_data(poly_data, scale_factor, center_ras)
+    wm_lesion_mask = mesh_to_volume(wm_lesion_poly_data, resectable_mask)
+    image = blend(image, csf_noise_image, wm_lesion_mask, sigmas, pad=pad)
     image = clean_outside_resectable(
-        original_image,
-        image,
-        resectable_mask,
-        gray_matter_mask,
-    )
-    if verbose:
-        duration = time.time() - start
-        print(f'White matter lesion: {duration:.1f} seconds')
-
+        original_image, image, resectable_mask, gray_matter_mask)
     return image
+
+
+def add_clot(
+        original_image,
+        resected_image,
+        csf_noise_image,
+        resection_mask,
+        resection_erosion_radius,
+        resection_radii,
+        clot_size_ratio_range,
+        angles,
+        noise_offset,
+        sphere_poly_data,
+        percentiles,
+        sigmas,
+        verbose=False,
+        ):
+    with timer(f'erosion with radius {resection_erosion_radius}', verbose):
+        eroded_resection_mask = sitk.BinaryErode(
+            resection_mask,
+            3 * [resection_erosion_radius],
+        )
+    with timer('random voxel RAS', verbose):
+        center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
+    resection_radii = np.array(resection_radii)
+    tensor = torch.FloatTensor(3)
+    clot_size_ratios = tensor.uniform_(*clot_size_ratio_range).numpy()
+    clot_radii = resection_radii / clot_size_ratios
+
+    with timer('clot poly data', verbose):
+        clot_poly_data = get_resection_poly_data(
+            center_clot_ras,
+            clot_radii,
+            angles,
+            noise_offset=noise_offset * 2,
+            sphere_poly_data=sphere_poly_data,
+            verbose=verbose,
+        )
+    with timer('clot mesh to volume', verbose):
+        raw_clot_mask = mesh_to_volume(
+            clot_poly_data,
+            resected_image,
+        )
+
+    with timer('intersection', verbose):
+        clot_mask = sitk_and(raw_clot_mask, eroded_resection_mask)
+
+    with timer('bright noise', verbose):
+        bright_noise_image = get_bright_noise(
+            original_image,
+            csf_noise_image,
+            percentiles,
+        )
+
+    with timer('Blending', verbose):
+        resected_image = blend(
+            resected_image,
+            bright_noise_image,
+            clot_mask,
+            sigmas,
+        )
+    return resected_image, center_clot_ras
