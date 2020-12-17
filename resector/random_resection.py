@@ -33,6 +33,7 @@ class RandomResection:
             add_resected_structures=False,
             simplex_path=None,
             wm_lesion=False,
+            clot=False,
             shape=None,
             texture=None,
             seed=None,
@@ -68,6 +69,7 @@ class RandomResection:
         self.shape = shape
         self.texture = texture
         self.wm_lesion = wm_lesion
+        self.clot = clot
 
     def __call__(self, subject):
         if self.verbose:
@@ -102,7 +104,7 @@ class RandomResection:
             duration = time.time() - start
             print(f'[Prepare resection images]: {duration:.1f} seconds')
 
-        resected_brain, resection_mask, resection_center = resect(
+        resected_brain, resection_mask, resection_center, clot_center = resect(
             t1_pre,
             gray_matter_mask,
             resectable_hemisphere_mask,
@@ -113,10 +115,12 @@ class RandomResection:
             noise_offset=resection_params['noise_offset'],
             sphere_poly_data=self.sphere_poly_data,
             wm_lesion=self.wm_lesion,
+            clot=self.clot,
             simplex_path=self.simplex_path,
             verbose=self.verbose,
         )
         resection_params['resection_center'] = resection_center
+        resection_params['clot_center'] = clot_center
         resected_brain_array = self.sitk_to_array(resected_brain)
         resected_mask_array = self.sitk_to_array(resection_mask)
         image_resected = self.add_channels_axis(resected_brain_array)

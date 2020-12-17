@@ -19,6 +19,7 @@ from pathlib import Path
 @click.option('--simplex-path', '-n', type=click.Path(exists=True))
 @click.option('--std-blur', type=float)
 @click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False)
+@click.option('--clot/--no-clot', '-c', type=bool, default=False)
 @click.option('--verbose/--no-verbose', '-v', type=bool, default=False)
 def main(
         input_path,
@@ -32,6 +33,7 @@ def main(
         simplex_path,
         std_blur,
         wm_lesion,
+        clot,
         verbose,
         ):
     """Console script for resector."""
@@ -82,6 +84,7 @@ def main(
         kwargs['sigmas_range'] = std_blur, std_blur
     kwargs['simplex_path'] = simplex_path
     kwargs['wm_lesion'] = wm_lesion
+    kwargs['clot'] = clot
     kwargs['verbose'] = verbose
 
     transform = torchio.Compose((

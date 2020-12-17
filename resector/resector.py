@@ -1,7 +1,9 @@
 import time
 
+import torch
+import numpy as np
 import SimpleITK as sitk
-from .texture import blend, clean_outside_resectable
+from .texture import blend, clean_outside_resectable, get_bright_noise
 from .mesh import (
     get_resection_poly_data,
     get_ellipsoid_poly_data,
@@ -30,6 +32,8 @@ def resect(
         scale_white_matter=3,
         wm_lesion=False,
         clot=False,
+        clot_erosion_radius=1,
+        clot_size_ratio=(1.5, 3),
         sphere_poly_data=None,
         noise_offset=None,
         simplex_path=None,
@@ -134,9 +138,18 @@ def resect(
         duration = time.time() - start
         print(f'Blending: {duration:.1f} seconds')
 
+    center_clot_ras = None
     if clot:
-        center_clot_ras = get_random_voxel_ras(resection_mask)
-        clot_radii = [n / 5 for n in radii]
+        if verbose:
+            start = time.time()
+        eroded_resection_mask = sitk.BinaryErode(
+            resection_mask,
+            3 * [clot_erosion_radius],
+        )
+        center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
+        radii = np.array(radii)
+        clot_size_ratios = torch.FloatTensor(3).uniform_(*clot_size_ratio).numpy()
+        clot_radii = radii / clot_size_ratios
         clot_poly_data = get_resection_poly_data(
             center_clot_ras,
             clot_radii,
@@ -149,14 +162,22 @@ def resect(
             clot_poly_data,
             resectable_hemisphere_mask,
         )
-        clot_mask = sitk_and(raw_clot_mask, resection_mask)
-        noise_image = sitk.InvertIntensity(noise_image)
+
+        clot_mask = sitk_and(raw_clot_mask, eroded_resection_mask)
+        bright_noise_image = get_bright_noise(
+            original_image,
+            noise_image,
+            (90, 99),
+        )
         resected_image = blend(
             resected_image,
-            noise_image,
+            bright_noise_image,
             clot_mask,
             sigmas,
             simplex_path=simplex_path,
         )
+        if verbose:
+            duration = time.time() - start
+            print(f'Clot: {duration:.1f} seconds')
 
-    return resected_image, resection_mask, center_ras
+    return resected_image, resection_mask, center_ras, center_clot_ras
