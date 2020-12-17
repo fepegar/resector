@@ -1,8 +1,11 @@
+import time
+
 import torch
 import numpy as np
 import nibabel as nib
 import SimpleITK as sitk
 
+from .mesh import scale_poly_data, mesh_to_volume
 from .image import get_subvolume, get_bounding_box
 
 
@@ -127,3 +130,51 @@ def get_bright_noise(image, csf_noise, percentiles):
     perc_b = np.percentile(image_array, max_percentile)
     new_mean = torch.FloatTensor(1).uniform_(perc_a, perc_b).item()
     return csf_noise + (new_mean - csf_mean)
+
+
+def add_wm_lesion(
+        image,
+        original_image,
+        csf_noise_image,
+        poly_data,
+        scale_factor,
+        center_ras,
+        resectable_mask,
+        gray_matter_mask,
+        sigmas,
+        pad,
+        verbose=False,
+        ):
+    if verbose:
+        start = time.time()
+
+    wm_lesion_poly_data = scale_poly_data(
+        poly_data,
+        scale_factor,
+        center_ras,
+    )
+
+    wm_lesion_mask = mesh_to_volume(
+        wm_lesion_poly_data,
+        resectable_mask,
+    )
+
+    image = blend(
+        image,
+        csf_noise_image,
+        wm_lesion_mask,
+        sigmas,
+        pad=pad,
+    )
+
+    image = clean_outside_resectable(
+        original_image,
+        image,
+        resectable_mask,
+        gray_matter_mask,
+    )
+    if verbose:
+        duration = time.time() - start
+        print(f'White matter lesion: {duration:.1f} seconds')
+
+    return image

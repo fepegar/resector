@@ -48,7 +48,6 @@ def get_ellipsoid_poly_data(
         angles,
         sphere_poly_data=None,
         ):
-    from .mesh import transform_poly_data
     if sphere_poly_data is None:
         sphere_poly_data = get_sphere_poly_data()
     ellipsoid = transform_poly_data(

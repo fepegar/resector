@@ -3,12 +3,11 @@ import time
 import torch
 import numpy as np
 import SimpleITK as sitk
-from .texture import blend, clean_outside_resectable, get_bright_noise
+from .texture import blend, add_wm_lesion, get_bright_noise
 from .mesh import (
     get_resection_poly_data,
     get_ellipsoid_poly_data,
     mesh_to_volume,
-    scale_poly_data,
 )
 from .image import (
     get_largest_connected_component,
@@ -59,42 +58,27 @@ def resect(
         if verbose:
             duration = time.time() - start
             print(f'Noisy mesh: {duration:.1f} seconds')
-        if wm_lesion:
-            if verbose:
-                start = time.time()
-            wm_lesion_poly_data = scale_poly_data(
-                noisy_poly_data,
-                scale_white_matter,
-                center_ras,
-            )
-
-            wm_lesion_mask = mesh_to_volume(
-                wm_lesion_poly_data,
-                resectable_hemisphere_mask,
-            )
-            wm_sigmas = 3 * (sigma_white_matter,)
-            image = blend(
-                image,
-                noise_image,
-                wm_lesion_mask,
-                wm_sigmas,
-                pad=20,
-            )
-
-            image = clean_outside_resectable(
-                original_image,
-                image,
-                resectable_hemisphere_mask,
-                gray_matter_mask,
-            )
-            if verbose:
-                duration = time.time() - start
-                print(f'White matter lesion: {duration:.1f} seconds')
 
         raw_resection_mask = mesh_to_volume(
             noisy_poly_data,
             resectable_hemisphere_mask,
         )
+
+        if wm_lesion:
+            image = add_wm_lesion(
+                image,
+                original_image,
+                noise_image,
+                noisy_poly_data,
+                scale_white_matter,
+                center_ras,
+                resectable_hemisphere_mask,
+                gray_matter_mask,
+                3 * (sigma_white_matter,),
+                pad=20,
+                verbose=verbose,
+            )
+
     elif shape == 'cuboid':
         raw_resection_mask = get_cuboid_image(
             radii,
