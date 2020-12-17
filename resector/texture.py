@@ -9,6 +9,7 @@ from .image import (
     get_bounding_box,
     get_random_voxel_ras,
     sitk_and,
+    erode_bounding_box,
 )
 from .mesh import scale_poly_data, mesh_to_volume, get_resection_poly_data
 
@@ -151,11 +152,16 @@ def add_wm_lesion(
         pad,
         verbose=False,
         ):
-    wm_lesion_poly_data = scale_poly_data(poly_data, scale_factor, center_ras)
-    wm_lesion_mask = mesh_to_volume(wm_lesion_poly_data, resectable_mask)
-    image = blend(image, csf_noise_image, wm_lesion_mask, sigmas, pad=pad)
-    image = clean_outside_resectable(
-        original_image, image, resectable_mask, gray_matter_mask)
+    with timer('white matter mesh', verbose):
+        wm_lesion_poly_data = scale_poly_data(
+            poly_data, scale_factor, center_ras)
+    with timer('white matter mesh to volume', verbose):
+        wm_lesion_mask = mesh_to_volume(wm_lesion_poly_data, resectable_mask)
+    with timer('white matter blend', verbose):
+        image = blend(image, csf_noise_image, wm_lesion_mask, sigmas, pad=pad)
+    with timer('white matter clean', verbose):
+        image = clean_outside_resectable(
+            original_image, image, resectable_mask, gray_matter_mask)
     return image
 
 
@@ -175,10 +181,8 @@ def add_clot(
         verbose=False,
         ):
     with timer(f'erosion with radius {resection_erosion_radius}', verbose):
-        eroded_resection_mask = sitk.BinaryErode(
-            resection_mask,
-            3 * [resection_erosion_radius],
-        )
+        eroded_resection_mask = erode_bounding_box(
+            resection_mask, resection_erosion_radius)
     with timer('random voxel RAS', verbose):
         center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
     resection_radii = np.array(resection_radii)

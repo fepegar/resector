@@ -105,3 +105,16 @@ def get_cuboid_image(radii_world, reference: sitk.Image, center_ras):
 
 def not_empty(image):
     return sitk.GetArrayViewFromImage(image).sum() > 0
+
+
+def erode_bounding_box(image, radius):
+    bb = get_bounding_box(image)
+    index, size = bb[:3], bb[3:]
+    subvolume = get_subvolume(image, bb)
+    eroded = sitk.BinaryErode(subvolume, 3 * (radius,))
+    result = image * 0
+    paste = sitk.PasteImageFilter()
+    paste.SetDestinationIndex(index)
+    paste.SetSourceSize(size)
+    eroded = paste.Execute(result, eroded)
+    return eroded
