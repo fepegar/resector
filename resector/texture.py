@@ -66,6 +66,8 @@ def blend(
         simplex_path=None,
         pad=10,
         ):
+    assert image.GetSize() == noise_image.GetSize()
+    assert image.GetSize() == mask.GetSize()
     bounding_box = get_bounding_box(mask, pad=pad)
     sub_image = get_subvolume(image, bounding_box)
     sub_mask = get_subvolume(mask, bounding_box)
@@ -82,6 +84,12 @@ def blend(
     sub_mask = sitk.Cast(sub_mask, noise_image.GetPixelID())
     sub_mask = sitk.SmoothingRecursiveGaussian(sub_mask, sigmas)
     alpha = sub_mask
+
+    assert alpha.GetSize() == sub_image.GetSize()
+    assert alpha.GetSize() == sub_noise_image.GetSize()
+    assert alpha.GetPixelID() == sub_image.GetPixelID()
+    assert alpha.GetPixelID() == sub_noise_image.GetPixelID()
+
     sub_image_resected = alpha * sub_noise_image + (1 - alpha) * sub_image
     sub_image_resected = sitk.Cast(sub_image_resected, image.GetPixelID())
 

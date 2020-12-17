@@ -1,5 +1,6 @@
 import time
 
+import SimpleITK as sitk
 from .texture import blend, clean_outside_resectable
 from .mesh import (
     get_resection_poly_data,
@@ -34,6 +35,8 @@ def resect(
         simplex_path=None,
         verbose=False,
         ):
+    image = sitk.Cast(image, sitk.sitkFloat32)
+
     original_image = image
     center_ras = get_random_voxel_ras(gray_matter_mask)
 
@@ -131,7 +134,6 @@ def resect(
         duration = time.time() - start
         print(f'Blending: {duration:.1f} seconds')
 
-    clot = True
     if clot:
         center_clot_ras = get_random_voxel_ras(resection_mask)
         clot_radii = [n / 5 for n in radii]
@@ -148,7 +150,6 @@ def resect(
             resectable_hemisphere_mask,
         )
         clot_mask = sitk_and(raw_clot_mask, resection_mask)
-        import SimpleITK as sitk
         noise_image = sitk.InvertIntensity(noise_image)
         resected_image = blend(
             resected_image,
