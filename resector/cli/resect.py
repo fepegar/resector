@@ -99,7 +99,6 @@ def main(
     transformed = transform(subject)
     if verbose:
         start = time.time()
-    print(transformed['label'].data.dtype)
     transformed['image'].save(output_image_path)
     transformed['label'].save(output_label_path)
     if verbose:
