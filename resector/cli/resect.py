@@ -105,14 +105,11 @@ def main(
         resection_gray_matter_right=torchio.LabelMap(gm_paths[1]),
         resection_noise=torchio.ScalarImage(noise_path),
     )
-    transformed = transform(subject)
-    if verbose:
-        start = time.time()
-    transformed['image'].save(output_image_path)
-    transformed['label'].save(output_label_path)
-    if verbose:
-        duration = time.time() - start
-        print(f'Saving images: {duration:.1f} seconds')
+    with resector.timer('RandomResection', verbose):
+        transformed = transform(subject)
+    with resector.timer('Saving images', verbose):
+        transformed['image'].save(output_image_path)
+        transformed['label'].save(output_label_path)
     return 0
 
 

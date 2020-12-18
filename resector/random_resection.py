@@ -86,20 +86,23 @@ class RandomResection:
         )
 
         # Convert images to SimpleITK
-        t1_pre = subject[self.image_name].as_sitk()
-        hemisphere = resection_params['hemisphere']
-        gray_matter_image = subject[f'resection_gray_matter_{hemisphere}']
-        gray_matter_mask = gray_matter_image.as_sitk()
-        resectable_tissue_image = subject[f'resection_resectable_{hemisphere}']
-        resectable_tissue_mask = resectable_tissue_image.as_sitk()
+        with timer('Convert to SITK', self.verbose):
+            t1_pre = subject[self.image_name].as_sitk()
+            hemisphere = resection_params['hemisphere']
+            gm_name = f'resection_gray_matter_{hemisphere}'
+            gray_matter_image = subject[gm_name]
+            gray_matter_mask = gray_matter_image.as_sitk()
+            resectable_name = f'resection_resectable_{hemisphere}'
+            resectable_tissue_image = subject[resectable_name]
+            resectable_tissue_mask = resectable_tissue_image.as_sitk()
 
-        add_wm = resection_params['add_wm_lesion']
-        add_clot = resection_params['add_clot']
-        use_csf_image = self.texture is None or add_wm or add_clot
-        if use_csf_image:
-            noise_image = subject['resection_noise'].as_sitk()
-        else:
-            noise_image = None
+            add_wm = resection_params['add_wm_lesion']
+            add_clot = resection_params['add_clot']
+            use_csf_image = self.texture is None or add_wm or add_clot
+            if use_csf_image:
+                noise_image = subject['resection_noise'].as_sitk()
+            else:
+                noise_image = None
 
         # Simulate resection
         with timer('Resection', self.verbose):
@@ -126,10 +129,12 @@ class RandomResection:
         resection_params['resection_center'] = resection_center
         resection_params['clot_center'] = clot_center
 
-        resected_brain_array = self.sitk_to_array(resected_brain)
-        resected_mask_array = self.sitk_to_array(resection_mask)
-        image_resected = self.add_channels_axis(resected_brain_array)
-        resection_label = self.add_channels_axis(resected_mask_array)
+        # Convert from SITK
+        with timer('Convert from SITK', self.verbose):
+            resected_brain_array = self.sitk_to_array(resected_brain)
+            resected_mask_array = self.sitk_to_array(resection_mask)
+            image_resected = self.add_channels_axis(resected_brain_array)
+            resection_label = self.add_channels_axis(resected_mask_array)
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
