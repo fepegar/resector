@@ -143,9 +143,7 @@ def get_bright_noise(image, csf_noise, percentiles):
     """
     image_array = sitk.GetArrayViewFromImage(image)
     csf_mean = sitk.GetArrayViewFromImage(csf_noise).mean()
-    min_percentile, max_percentile = 90, 99
-    perc_a = np.percentile(image_array, min_percentile)
-    perc_b = np.percentile(image_array, max_percentile)
+    perc_a, perc_b = np.percentile(image_array, percentiles)
     new_mean = torch.FloatTensor(1).uniform_(perc_a, perc_b).item()
     return csf_noise + (new_mean - csf_mean)
 
