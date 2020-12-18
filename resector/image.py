@@ -1,4 +1,3 @@
-import time
 import torch
 import numpy as np
 import SimpleITK as sitk
@@ -50,7 +49,8 @@ def sitk_and(image_a, image_b):
     image_b_size = image_b.GetSize()
     if image_a_size != image_b_size:
         message = (
-            f'Sizes of image_a ({image_a_size}) and image_b ({image_b_size}) do not match'
+            f'Sizes of image_a ({image_a_size})'
+            ' and image_b ({image_b_size}) do not match'
         )
         raise ValueError(message)
     image_a = sitk.Cast(image_a, sitk.sitkUInt8)
@@ -59,8 +59,6 @@ def sitk_and(image_a, image_b):
 
 
 def get_random_voxel(mask, border=False, verbose=False):
-    if verbose:
-        start = time.time()
     if border:
         image = sitk.BinaryContour(mask)
     else:
@@ -71,9 +69,6 @@ def get_random_voxel(mask, border=False, verbose=False):
     random_index = torch.randint(N, (1,)).item()
     coords_voxel = coords[random_index]
     coords_voxel = [int(n) for n in reversed(coords_voxel)]  # NumPy vs ITK
-    if verbose:
-        duration = time.time() - start
-        print(f'get_random_voxel: {duration:.1f} seconds')
     return coords_voxel
 
 

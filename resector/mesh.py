@@ -9,7 +9,6 @@ import nibabel as nib
 import SimpleITK as sitk
 from noise import snoise3
 
-from .timer import timer
 from .image import get_subvolume
 from .io import nib_to_sitk, write, get_sphere_poly_data
 
