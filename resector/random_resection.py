@@ -6,9 +6,9 @@ from math import tau
 import SimpleITK as sitk
 
 import torchio as tio
-from torchio import LABEL, DATA, AFFINE, IMAGE
+from torchio import IMAGE
 
-from .io import nib_to_sitk, get_sphere_poly_data
+from .io import get_sphere_poly_data
 from .resector import resect
 
 
@@ -18,10 +18,10 @@ class Hemisphere(enum.Enum):
     RIGHT = 'right'
 
 
-
 class RandomResection:
     def __init__(
             self,
+            image_name=IMAGE,
             volumes_range=None,
             volumes=None,
             sigmas_range=(0.5, 1),
@@ -32,17 +32,17 @@ class RandomResection:
             add_params=True,
             add_resected_structures=False,
             simplex_path=None,
-            wm_lesion=False,
-            clot=False,
+            wm_lesion_p=1,
+            clot_p=1,
             shape=None,
             texture=None,
-            seed=None,
             verbose=False,
             ):
         """
         Either volumes or volume_range should be passed
         volumes is an iterable of possible volumes (they come from EPISURG)
-        volumes_range is a range for a uniform distribution (TODO: fit a distribution?)
+        volumes_range is a range for a uniform distribution
+        (TODO: fit a distribution?)
 
         Assume there is a key 'image' in sample dict
         Assume there is a key 'resection_resectable_left' in sample dict
@@ -53,9 +53,10 @@ class RandomResection:
         """
         if (volumes is None and volumes_range is None
                 or volumes is not None and volumes_range is not None):
-            raise ValueError('Please enter a value for volumes or volumes_range')
+            raise ValueError('Enter a value for volumes or volumes_range')
         self.volumes = volumes
         self.volumes_range = volumes_range
+        self.image_name = image_name
         self.sigmas_range = sigmas_range
         self.radii_ratio_range = radii_ratio_range
         self.angles_range = angles_range
@@ -68,14 +69,11 @@ class RandomResection:
         self.simplex_path = simplex_path
         self.shape = shape
         self.texture = texture
-        self.wm_lesion = wm_lesion
-        self.clot = clot
+        self.wm_lesion = wm_lesion_p > torch.rand(1)
+        self.clot = clot_p > torch.rand(1)
 
     def __call__(self, subject):
-        if self.verbose:
-            print('Sample stem for resection:', subject[IMAGE]['stem'])
-            import time
-            start = time.time()
+        # Sampler random parameters
         resection_params = self.get_params(
             self.volumes,
             self.volumes_range,
@@ -83,34 +81,25 @@ class RandomResection:
             self.radii_ratio_range,
             self.angles_range,
         )
-        t1_pre = nib_to_sitk(
-            subject[IMAGE][DATA][0],
-            subject[IMAGE][AFFINE],
-        )
-        hemisphere = resection_params['hemisphere']
-        gray_matter_mask = nib_to_sitk(
-            subject[f'resection_gray_matter_{hemisphere}'][DATA][0],
-            subject[f'resection_gray_matter_{hemisphere}'][AFFINE],
-        )
-        resectable_hemisphere_mask = nib_to_sitk(
-            subject[f'resection_resectable_{hemisphere}'][DATA][0],
-            subject[f'resection_resectable_{hemisphere}'][AFFINE],
-        )
-        noise_image = nib_to_sitk(
-            subject['resection_noise'][DATA][0],
-            subject['resection_noise'][AFFINE],
-        )
-        if self.verbose:
-            duration = time.time() - start
-            print(f'[Prepare resection images]: {duration:.1f} seconds')
 
+        # Convert images to SimpleITK
+        t1_pre = subject[self.image_name].as_sitk()
+        hemisphere = resection_params['hemisphere']
+        gray_matter_image = subject[f'resection_gray_matter_{hemisphere}']
+        gray_matter_mask = gray_matter_image.as_sitk()
+        resectable_tissue_image = subject[f'resection_resectable_{hemisphere}']
+        resectable_tissue_mask = resectable_tissue_image.as_sitk()
+        noise_image = subject['resection_noise'].as_sitk()
+
+        # Simulate resection
         resected_brain, resection_mask, resection_center, clot_center = resect(
             t1_pre,
             gray_matter_mask,
-            resectable_hemisphere_mask,
+            resectable_tissue_mask,
             noise_image,
             resection_params['sigmas'],
             resection_params['radii'],
+            shape=self.shape,
             angles=resection_params['angles'],
             noise_offset=resection_params['noise_offset'],
             sphere_poly_data=self.sphere_poly_data,
@@ -119,8 +108,11 @@ class RandomResection:
             simplex_path=self.simplex_path,
             verbose=self.verbose,
         )
+
+        # Store centers for visualization purposes
         resection_params['resection_center'] = resection_center
         resection_params['clot_center'] = clot_center
+
         resected_brain_array = self.sitk_to_array(resected_brain)
         resected_mask_array = self.sitk_to_array(resection_mask)
         image_resected = self.add_channels_axis(resected_brain_array)
@@ -128,23 +120,23 @@ class RandomResection:
         assert image_resected.ndim == 4
         assert resection_label.ndim == 4
 
-        ## Update subject
+        # Update subject
         if self.delete_resection_keys:
-            del subject['resection_gray_matter_left']
-            del subject['resection_gray_matter_right']
-            del subject['resection_resectable_left']
-            del subject['resection_resectable_right']
-            del subject['resection_noise']
+            subject.remove_image('resection_gray_matter_left')
+            subject.remove_image('resection_gray_matter_right')
+            subject.remove_image('resection_resectable_left')
+            subject.remove_image('resection_resectable_right')
+            subject.remove_image('resection_noise')
 
         # Add resected image and label to subject
         if self.add_params:
             subject['random_resection'] = resection_params
         if self.keep_original:
-            subject['image_original'] = copy.deepcopy(subject[IMAGE])
-        subject[IMAGE][DATA] = torch.from_numpy(image_resected)
+            subject['image_original'] = copy.deepcopy(subject[self.image_name])
+        subject[self.image_name].data = torch.from_numpy(image_resected)
         label = tio.LabelMap(
             tensor=resection_label,
-            affine=subject[IMAGE]['affine'],
+            affine=subject[self.image_name].affine,
         )
         subject.add_image(label, 'label')
 
@@ -152,9 +144,6 @@ class RandomResection:
             subject['resected_structures'] = self.get_resected_structures(
                 subject, resection_mask)
 
-        if self.verbose:
-            duration = time.time() - start
-            print(f'RandomResection: {duration:.1f} seconds')
         return subject
 
     def get_params(
@@ -164,7 +153,7 @@ class RandomResection:
             sigmas_range,
             radii_ratio_range,
             angles_range,
-        ):
+            ):
         # Hemisphere
         hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
 
@@ -212,7 +201,7 @@ class RandomResection:
         from tempfile import NamedTemporaryFile
         from utils import AffineMatrix, sglob
         from episurg.parcellation import GIFParcellation
-        mni_path = Path(sample[IMAGE]['path'])
+        mni_path = Path(sample[self.image_name]['path'])
         mni_dir = mni_path.parent
         dataset_dir = mni_dir.parent
         parcellation_dir = dataset_dir / 'parcellation'
