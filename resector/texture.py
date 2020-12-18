@@ -67,16 +67,27 @@ def add_simplex_noise(
     return sub_noise_image + simplex_patch
 
 
+def get_percentile(image, percentile):
+    array = sitk.GetArrayViewFromImage(image)
+    return np.percentile(array, percentile)
+
+
 def blend(
         image,
         noise_image,
         mask,
         sigmas,
         simplex_path=None,
+        texture=None,
         pad=10,
         ):
-    assert image.GetSize() == noise_image.GetSize()
-    assert image.GetSize() == mask.GetSize()
+    if texture is not None:
+        if texture == 'minimum':
+            new_mean = get_percentile(image, 1)
+        elif texture == 'random':
+            percentile = torch.randint(1, 100, (1,)).item()
+            new_mean = get_percentile(image, percentile)
+        noise_image = image * 0 + new_mean
     bounding_box = get_bounding_box(mask, pad=pad)
     sub_image = get_subvolume(image, bounding_box)
     sub_mask = get_subvolume(mask, bounding_box)

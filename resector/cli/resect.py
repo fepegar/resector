@@ -18,7 +18,8 @@ from pathlib import Path
 @click.option('--volumes-path', '-p', type=click.Path(exists=True))
 @click.option('--simplex-path', '-n', type=click.Path(exists=True))
 @click.option('--std-blur', type=float)
-@click.option('--shape', type=str)
+@click.option('--shape', type=click.Choice(['ellipsoid', 'cuboid']))
+@click.option('--texture', type=click.Choice(['minimum', 'random']))
 @click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False)
 @click.option('--clot/--no-clot', '-c', type=bool, default=False)
 @click.option('--verbose/--no-verbose', '-v', type=bool, default=False)
@@ -34,6 +35,7 @@ def main(
         simplex_path,
         std_blur,
         shape,
+        texture,
         wm_lesion,
         clot,
         verbose,
@@ -89,6 +91,7 @@ def main(
     kwargs['clot_p'] = clot
     kwargs['verbose'] = verbose
     kwargs['shape'] = shape
+    kwargs['texture'] = texture
 
     transform = torchio.Compose((
         torchio.ToCanonical(),

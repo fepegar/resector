@@ -8,8 +8,9 @@ import SimpleITK as sitk
 import torchio as tio
 from torchio import IMAGE
 
-from .io import get_sphere_poly_data
+from .timer import timer
 from .resector import resect
+from .io import get_sphere_poly_data
 
 
 @enum.unique
@@ -64,15 +65,15 @@ class RandomResection:
         self.keep_original = keep_original
         self.add_params = add_params
         self.add_resected_structures = add_resected_structures
-        self.verbose = verbose
         self.sphere_poly_data = get_sphere_poly_data()
         self.simplex_path = simplex_path
         self.shape = shape
         self.texture = texture
-        self.wm_lesion = wm_lesion_p > torch.rand(1)
-        self.clot = clot_p > torch.rand(1)
+        self.wm_lesion_p = wm_lesion_p
+        self.clot_p = clot_p
+        self.verbose = verbose
 
-    def __call__(self, subject):
+    def __call__(self, subject: tio.Subject):
         # Sampler random parameters
         resection_params = self.get_params(
             self.volumes,
@@ -80,6 +81,8 @@ class RandomResection:
             self.sigmas_range,
             self.radii_ratio_range,
             self.angles_range,
+            self.wm_lesion_p,
+            self.clot_p,
         )
 
         # Convert images to SimpleITK
@@ -89,25 +92,35 @@ class RandomResection:
         gray_matter_mask = gray_matter_image.as_sitk()
         resectable_tissue_image = subject[f'resection_resectable_{hemisphere}']
         resectable_tissue_mask = resectable_tissue_image.as_sitk()
-        noise_image = subject['resection_noise'].as_sitk()
+
+        add_wm = resection_params['add_wm_lesion']
+        add_clot = resection_params['add_clot']
+        use_csf_image = self.texture is None or add_wm or add_clot
+        if use_csf_image:
+            noise_image = subject['resection_noise'].as_sitk()
+        else:
+            noise_image = None
 
         # Simulate resection
-        resected_brain, resection_mask, resection_center, clot_center = resect(
-            t1_pre,
-            gray_matter_mask,
-            resectable_tissue_mask,
-            noise_image,
-            resection_params['sigmas'],
-            resection_params['radii'],
-            shape=self.shape,
-            angles=resection_params['angles'],
-            noise_offset=resection_params['noise_offset'],
-            sphere_poly_data=self.sphere_poly_data,
-            wm_lesion=self.wm_lesion,
-            clot=self.clot,
-            simplex_path=self.simplex_path,
-            verbose=self.verbose,
-        )
+        with timer('Resection', self.verbose):
+            results = resect(
+                t1_pre,
+                gray_matter_mask,
+                resectable_tissue_mask,
+                resection_params['sigmas'],
+                resection_params['radii'],
+                noise_image=noise_image,
+                shape=self.shape,
+                texture=self.texture,
+                angles=resection_params['angles'],
+                noise_offset=resection_params['noise_offset'],
+                sphere_poly_data=self.sphere_poly_data,
+                wm_lesion=add_wm,
+                clot=add_clot,
+                simplex_path=self.simplex_path,
+                verbose=self.verbose,
+            )
+        resected_brain, resection_mask, resection_center, clot_center = results
 
         # Store centers for visualization purposes
         resection_params['resection_center'] = resection_center
@@ -126,7 +139,8 @@ class RandomResection:
             subject.remove_image('resection_gray_matter_right')
             subject.remove_image('resection_resectable_left')
             subject.remove_image('resection_resectable_right')
-            subject.remove_image('resection_noise')
+            if use_csf_image:
+                subject.remove_image('resection_noise')
 
         # Add resected image and label to subject
         if self.add_params:
@@ -153,6 +167,8 @@ class RandomResection:
             sigmas_range,
             radii_ratio_range,
             angles_range,
+            wm_lesion_p,
+            clot_p,
             ):
         # Hemisphere
         hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
@@ -186,6 +202,12 @@ class RandomResection:
         # Offset for noise
         noise_offset = torch.randint(1000, (1,)).item()
 
+        # Add white matter lesion
+        add_wm_lesion = wm_lesion_p > torch.rand(1)
+
+        # Add blood clot
+        add_clot = clot_p > torch.rand(1)
+
         parameters = dict(
             hemisphere=hemisphere.value,
             volume=volume,
@@ -193,6 +215,8 @@ class RandomResection:
             angles=angles,
             radii=radii,
             noise_offset=noise_offset,
+            add_wm_lesion=add_wm_lesion,
+            add_clot=add_clot,
         )
         return parameters
 

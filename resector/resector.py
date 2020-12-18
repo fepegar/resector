@@ -19,10 +19,11 @@ def resect(
         image,
         gray_matter_mask,
         resectable_hemisphere_mask,
-        noise_image,
         sigmas,
         radii,
+        noise_image=None,
         shape=None,
+        texture=None,
         angles=None,
         sigma_white_matter=10,
         scale_white_matter=3,
@@ -59,6 +60,7 @@ def resect(
             )
 
         if wm_lesion:
+            assert noise_image is not None
             with timer('white matter lesion', verbose):
                 image = add_wm_lesion(
                     image,
@@ -110,6 +112,7 @@ def resect(
             resection_mask,
             sigmas,
             simplex_path=simplex_path,
+            texture=texture,
         )
 
     center_clot_ras = None

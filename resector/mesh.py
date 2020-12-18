@@ -10,7 +10,7 @@ import SimpleITK as sitk
 from noise import snoise3
 
 from .image import get_subvolume
-from .io import nib_to_sitk, write, get_sphere_poly_data
+from .io import nib_to_sitk, write, get_sphere_poly_data, write_poly_data
 
 
 def get_resection_poly_data(
@@ -169,19 +169,33 @@ def compute_normals(poly_data):
 
 
 def mesh_to_volume(poly_data, reference):
+    result = reference * 0
     with NamedTemporaryFile(suffix='.nii') as reference_file:
         reference_path = reference_file.name
         bounding_box = get_bounding_box_from_mesh(reference, poly_data)
         subvolume = get_subvolume(reference, bounding_box)
 
         # Use image stencil to convert mesh to image
-        write(subvolume, reference_path)  # TODO: use an existing image
+        try:
+            write(subvolume, reference_path)  # TODO: use an existing image
+        except RuntimeError as e:
+            import warnings
+            error_mesh_path = '/tmp/error.vtp'
+            error_image_path = '/tmp/error.nii'
+            write_poly_data(flipxy(poly_data), error_mesh_path)
+            write(reference, error_image_path)
+            message = (
+                f'RuntimeError: {e}'
+                f'\n\nPoly data (flipped) saved in {error_mesh_path}.'
+                f'Image saved in {error_image_path}.'
+            )
+            warnings.warn(message)
+            return result
         sphere_mask = _mesh_to_volume(poly_data, reference_path)
     index, size = bounding_box[:3], bounding_box[3:]
     paste = sitk.PasteImageFilter()
     paste.SetDestinationIndex(index)
     paste.SetSourceSize(size)
-    result = reference * 0
     result = paste.Execute(result, sphere_mask)
     return result
 
