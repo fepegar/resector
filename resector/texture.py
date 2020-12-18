@@ -152,9 +152,7 @@ def add_wm_lesion(
         pad,
         verbose=False,
         ):
-    with timer('white matter mesh', verbose):
-        wm_lesion_poly_data = scale_poly_data(
-            poly_data, scale_factor, center_ras)
+    wm_lesion_poly_data = scale_poly_data(poly_data, scale_factor, center_ras)
     with timer('white matter mesh to volume', verbose):
         wm_lesion_mask = mesh_to_volume(wm_lesion_poly_data, resectable_mask)
     with timer('white matter blend', verbose):
@@ -202,7 +200,7 @@ def add_clot(
     with timer('clot mesh to volume', verbose):
         raw_clot_mask = mesh_to_volume(
             clot_poly_data,
-            resected_image,
+            resection_mask,
         )
 
     with timer('intersection', verbose):

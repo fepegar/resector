@@ -6,8 +6,11 @@ from vtk.util.numpy_support import numpy_to_vtk
 from vtk.numpy_interface import dataset_adapter as dsa
 import numpy as np
 import nibabel as nib
+import SimpleITK as sitk
 from noise import snoise3
 
+from .timer import timer
+from .image import get_subvolume
 from .io import nib_to_sitk, write, get_sphere_poly_data
 
 
@@ -169,11 +172,19 @@ def compute_normals(poly_data):
 def mesh_to_volume(poly_data, reference):
     with NamedTemporaryFile(suffix='.nii') as reference_file:
         reference_path = reference_file.name
+        bounding_box = get_bounding_box_from_mesh(reference, poly_data)
+        subvolume = get_subvolume(reference, bounding_box)
 
         # Use image stencil to convert mesh to image
-        write(reference, reference_path)  # TODO: use an existing image
+        write(subvolume, reference_path)  # TODO: use an existing image
         sphere_mask = _mesh_to_volume(poly_data, reference_path)
-    return sphere_mask
+    index, size = bounding_box[:3], bounding_box[3:]
+    paste = sitk.PasteImageFilter()
+    paste.SetDestinationIndex(index)
+    paste.SetSourceSize(size)
+    result = reference * 0
+    result = paste.Execute(result, sphere_mask)
+    return result
 
 
 def _mesh_to_volume(poly_data, reference_path):
@@ -277,3 +288,19 @@ def flipxy(poly_data):
 
     poly_data = transform_filter.GetOutput()
     return poly_data
+
+
+def get_bounding_box_from_mesh(image, poly_data, pad=2):
+    wrap_data_object = dsa.WrapDataObject(poly_data)
+    points = wrap_data_object.Points
+    r, a, s = points.min(axis=0).tolist()
+    min_lps = -r, -a, s
+    r, a, s = points.max(axis=0).tolist()
+    max_lps = -r, -a, s
+    min_index = image.TransformPhysicalPointToContinuousIndex(min_lps)
+    max_index = image.TransformPhysicalPointToContinuousIndex(max_lps)
+    min_index = (np.floor(np.array(min_index)) - pad).astype(int)
+    max_index = (np.ceil(np.array(max_index)) + pad).astype(int)
+    size = max_index - min_index
+    bounding_box = min_index.tolist() + size.tolist()
+    return bounding_box
