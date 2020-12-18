@@ -182,12 +182,12 @@ def mesh_to_volume(poly_data, reference):
             import warnings
             error_mesh_path = '/tmp/error.vtp'
             error_image_path = '/tmp/error.nii'
-            write_poly_data(flipxy(poly_data), error_mesh_path)
+            write_poly_data(poly_data, error_mesh_path, flip=True)
             write(reference, error_image_path)
             message = (
                 f'RuntimeError: {e}'
-                f'\n\nPoly data (flipped) saved in {error_mesh_path}.'
-                f'Image saved in {error_image_path}.'
+                f'\n\nPoly data (flipped) saved in {error_mesh_path}'
+                f'\nImage saved in {error_image_path}\n\n'
             )
             warnings.warn(message)
             return result
@@ -314,6 +314,10 @@ def get_bounding_box_from_mesh(image, poly_data, pad=2):
     max_index = image.TransformPhysicalPointToContinuousIndex(max_lps)
     min_index = (np.floor(np.array(min_index)) - pad).astype(int)
     max_index = (np.ceil(np.array(max_index)) + pad).astype(int)
+    image_size = image.GetSize()
+    min_index[min_index < 0] = 0
+    for i in range(3):
+        max_index[i] = min(max_index[i], image_size[i])
     size = max_index - min_index
     bounding_box = min_index.tolist() + size.tolist()
     return bounding_box
