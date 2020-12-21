@@ -87,14 +87,21 @@ def get_sphere_poly_data():
     return poly_data
 
 
-def read_poly_data(path):
+def read_poly_data(path, flip=False):
     reader = vtk.vtkXMLPolyDataReader()
     reader.SetFileName(str(path))
     reader.Update()
-    return reader.GetOutput()
+    poly_data = reader.GetOutput()
+    if flip:
+        from .mesh import flipxy
+        poly_data = flipxy(poly_data)
+    return poly_data
 
 
-def write_poly_data(poly_data, path):
+def write_poly_data(poly_data, path, flip=False):
+    if flip:
+        from .mesh import flipxy
+        poly_data = flipxy(poly_data)
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetInputData(poly_data)
     writer.SetFileName(str(path))

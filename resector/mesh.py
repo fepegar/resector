@@ -6,14 +6,15 @@ from vtk.util.numpy_support import numpy_to_vtk
 from vtk.numpy_interface import dataset_adapter as dsa
 import numpy as np
 import nibabel as nib
+import SimpleITK as sitk
 from noise import snoise3
 
-from .io import nib_to_sitk, write
+from .image import get_subvolume
+from .io import nib_to_sitk, write, get_sphere_poly_data, write_poly_data
 
 
 def get_resection_poly_data(
-        poly_data,
-        center,
+        center_ras,
         radii,
         angles,
         noise_offset=1000,
@@ -21,10 +22,14 @@ def get_resection_poly_data(
         scale=1,
         deepcopy=True,
         smoothness=3,
+        sphere_poly_data=None,
+        verbose=False,
         ):
+    if sphere_poly_data is None:
+        sphere_poly_data = get_sphere_poly_data()
     if deepcopy:
         new_poly_data = vtk.vtkPolyData()
-        new_poly_data.DeepCopy(poly_data)
+        new_poly_data.DeepCopy(sphere_poly_data)
         poly_data = new_poly_data
     poly_data = add_noise_to_sphere(
         poly_data,
@@ -34,9 +39,26 @@ def get_resection_poly_data(
         smoothness=smoothness,
     )
     poly_data = center_poly_data(poly_data)
-    poly_data = transform_poly_data(poly_data, center, radii, angles)
+    poly_data = transform_poly_data(poly_data, center_ras, radii, angles)
     poly_data = compute_normals(poly_data)
     return poly_data
+
+
+def get_ellipsoid_poly_data(
+        radii_world,
+        center_ras,
+        angles,
+        sphere_poly_data=None,
+        ):
+    if sphere_poly_data is None:
+        sphere_poly_data = get_sphere_poly_data()
+    ellipsoid = transform_poly_data(
+        sphere_poly_data,
+        center_ras,
+        radii_world,
+        angles,
+    )
+    return ellipsoid
 
 
 def add_noise_to_sphere(poly_data, octaves, offset, scale, smoothness):
@@ -102,6 +124,37 @@ def transform_poly_data(poly_data, center, radii, degrees):
     return poly_data
 
 
+def get_center(poly_data):
+    f = vtk.vtkCenterOfMass()
+    f.SetInputData(poly_data)
+    f.Update()
+    return f.GetCenter()
+
+
+def scale_poly_data(poly_data, scale, center_ras):
+    goToOrigin = vtk.vtkTransform()
+    goToOrigin.Translate(tuple(-n for n in center_ras))  # terrible
+
+    comeFromOrigin = vtk.vtkTransform()
+    comeFromOrigin.Translate(center_ras)
+
+    scaleTransform = vtk.vtkTransform()
+    scaleTransform.Scale(3 * (scale,))
+
+    transform = goToOrigin
+    transform.PostMultiply()
+    transform.Concatenate(scaleTransform.GetMatrix())
+    transform.Concatenate(comeFromOrigin.GetMatrix())
+
+    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter.SetTransform(transform)
+    transform_filter.SetInputData(poly_data)
+    transform_filter.Update()
+
+    poly_data = transform_filter.GetOutput()
+    return poly_data
+
+
 def compute_normals(poly_data):
     normal_filter = vtk.vtkPolyDataNormals()
     normal_filter.AutoOrientNormalsOn()
@@ -116,13 +169,35 @@ def compute_normals(poly_data):
 
 
 def mesh_to_volume(poly_data, reference):
+    result = reference * 0
     with NamedTemporaryFile(suffix='.nii') as reference_file:
         reference_path = reference_file.name
+        bounding_box = get_bounding_box_from_mesh(reference, poly_data)
+        subvolume = get_subvolume(reference, bounding_box)
 
         # Use image stencil to convert mesh to image
-        write(reference, reference_path)  # TODO: use an existing image
+        try:
+            write(subvolume, reference_path)  # TODO: use an existing image
+        except RuntimeError as e:
+            import warnings
+            error_mesh_path = '/tmp/error.vtp'
+            error_image_path = '/tmp/error.nii'
+            write_poly_data(poly_data, error_mesh_path, flip=True)
+            write(reference, error_image_path)
+            message = (
+                f'RuntimeError: {e}'
+                f'\n\nPoly data (flipped) saved in {error_mesh_path}'
+                f'\nImage saved in {error_image_path}\n\n'
+            )
+            warnings.warn(message)
+            return result
         sphere_mask = _mesh_to_volume(poly_data, reference_path)
-    return sphere_mask
+    index, size = bounding_box[:3], bounding_box[3:]
+    paste = sitk.PasteImageFilter()
+    paste.SetDestinationIndex(index)
+    paste.SetSourceSize(size)
+    result = paste.Execute(result, sphere_mask)
+    return result
 
 
 def _mesh_to_volume(poly_data, reference_path):
@@ -147,7 +222,7 @@ def _mesh_to_volume(poly_data, reference_path):
     nii = nib.load(str(reference_path))
     check_header(nii)
     image_stencil_array = np.ones(nii.shape, dtype=np.uint8)
-    image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.affine)  # nii.get_qform())
+    image_stencil_nii = nib.Nifti1Image(image_stencil_array, nii.affine)
     image_stencil_nii.header['qform_code'] = 1
     image_stencil_nii.header['sform_code'] = 0
 
@@ -226,3 +301,23 @@ def flipxy(poly_data):
 
     poly_data = transform_filter.GetOutput()
     return poly_data
+
+
+def get_bounding_box_from_mesh(image, poly_data, pad=2):
+    wrap_data_object = dsa.WrapDataObject(poly_data)
+    points = wrap_data_object.Points
+    r, a, s = points.min(axis=0).tolist()
+    min_lps = -r, -a, s
+    r, a, s = points.max(axis=0).tolist()
+    max_lps = -r, -a, s
+    min_index = image.TransformPhysicalPointToContinuousIndex(min_lps)
+    max_index = image.TransformPhysicalPointToContinuousIndex(max_lps)
+    min_index = (np.floor(np.array(min_index)) - pad).astype(int)
+    max_index = (np.ceil(np.array(max_index)) + pad).astype(int)
+    image_size = image.GetSize()
+    min_index[min_index < 0] = 0
+    for i in range(3):
+        max_index[i] = min(max_index[i], image_size[i])
+    size = max_index - min_index
+    bounding_box = min_index.tolist() + size.tolist()
+    return bounding_box

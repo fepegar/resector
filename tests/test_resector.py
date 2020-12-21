@@ -5,6 +5,7 @@
 
 
 import unittest
+import torchio as tio
 from click.testing import CliRunner
 
 from resector import resector
@@ -15,7 +16,7 @@ class TestResector(unittest.TestCase):
     """Tests for `resector` package."""
 
     def setUp(self):
-        """Set up test fixtures, if any."""
+        self.subject = tio.datasets.FPG()
 
     def tearDown(self):
         """Tear down test fixtures, if any."""

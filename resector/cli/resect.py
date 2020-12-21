@@ -2,6 +2,7 @@
 
 """Console script for resector."""
 import sys
+import time
 import click
 from pathlib import Path
 
@@ -14,9 +15,14 @@ from pathlib import Path
 @click.option('--seed', '-s', type=int)
 @click.option('--min-volume', '-miv', type=int, default=50, show_default=True)
 @click.option('--max-volume', '-mav', type=int, default=5000, show_default=True)
-@click.option('--volumes-path', '-v', type=click.Path(exists=True))
+@click.option('--volumes-path', '-p', type=click.Path(exists=True))
 @click.option('--simplex-path', '-n', type=click.Path(exists=True))
 @click.option('--std-blur', type=float)
+@click.option('--shape', type=click.Choice(['ellipsoid', 'cuboid']))
+@click.option('--texture', type=click.Choice(['minimum', 'random']))
+@click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False)
+@click.option('--clot/--no-clot', '-c', type=bool, default=False)
+@click.option('--verbose/--no-verbose', '-v', type=bool, default=False)
 def main(
         input_path,
         parcellation_path,
@@ -28,6 +34,11 @@ def main(
         volumes_path,
         simplex_path,
         std_blur,
+        shape,
+        texture,
+        wm_lesion,
+        clot,
+        verbose,
         ):
     """Console script for resector."""
     import torchio
@@ -76,6 +87,11 @@ def main(
     if std_blur is not None:
         kwargs['sigmas_range'] = std_blur, std_blur
     kwargs['simplex_path'] = simplex_path
+    kwargs['wm_lesion_p'] = wm_lesion
+    kwargs['clot_p'] = clot
+    kwargs['verbose'] = verbose
+    kwargs['shape'] = shape
+    kwargs['texture'] = texture
 
     transform = torchio.Compose((
         torchio.ToCanonical(),
@@ -89,9 +105,11 @@ def main(
         resection_gray_matter_right=torchio.LabelMap(gm_paths[1]),
         resection_noise=torchio.ScalarImage(noise_path),
     )
-    transformed = transform(subject)
-    transformed['image'].save(output_image_path)
-    transformed['label'].save(output_label_path)
+    with resector.timer('RandomResection', verbose):
+        transformed = transform(subject)
+    with resector.timer('Saving images', verbose):
+        transformed['image'].save(output_image_path)
+        transformed['label'].save(output_label_path)
     return 0
 
 
