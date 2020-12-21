@@ -35,8 +35,8 @@ class RandomResection:
             simplex_path=None,
             wm_lesion_p=1,
             clot_p=1,
-            shape=None,
-            texture=None,
+            shape='noisy',
+            texture='csf',
             verbose=False,
             ):
         """

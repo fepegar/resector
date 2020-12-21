@@ -22,8 +22,8 @@ def resect(
         sigmas,
         radii,
         noise_image=None,
-        shape=None,
-        texture=None,
+        shape='noisy',
+        texture='csf',
         angles=None,
         sigma_white_matter=10,
         scale_white_matter=3,
@@ -42,7 +42,7 @@ def resect(
     original_image = image
     center_ras = get_random_voxel_ras(gray_matter_mask)
 
-    if shape is None:
+    if shape is 'noisy':
         with timer('Noisy mesh', verbose):
             noisy_poly_data = get_resection_poly_data(
                 center_ras,
@@ -104,7 +104,6 @@ def resect(
         # Use largest connected component only
         with timer('largest connected component', verbose):
             resection_mask = get_largest_connected_component(resection_mask)
-
     with timer('blending', verbose):
         resected_image = blend(
             image,

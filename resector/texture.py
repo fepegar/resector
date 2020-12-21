@@ -81,11 +81,11 @@ def blend(
         texture=None,
         pad=10,
         ):
-    if texture is not None:
-        if texture == 'minimum':
+    if texture != 'csf' and texture is not None:
+        if texture == 'dark':
             new_mean = get_percentile(image, 1)
         elif texture == 'random':
-            percentile = torch.randint(1, 100, (1,)).item()
+            percentile = torch.randint(1, 100, (1,)).item()  # i.e., [1, 99]
             new_mean = get_percentile(image, percentile)
         noise_image = image * 0 + new_mean
     bounding_box = get_bounding_box(mask, pad=pad)
