@@ -74,43 +74,35 @@ def get_percentile(image, percentile):
 
 def blend(
         image,
-        noise_image,
+        texture_image,
         mask,
         sigmas,
         simplex_path=None,
-        texture=None,
         pad=10,
         ):
-    if texture != 'csf' and texture is not None:
-        if texture == 'dark':
-            new_mean = get_percentile(image, 1)
-        elif texture == 'random':
-            percentile = torch.randint(1, 100, (1,)).item()  # i.e., [1, 99]
-            new_mean = get_percentile(image, percentile)
-        noise_image = image * 0 + new_mean
     bounding_box = get_bounding_box(mask, pad=pad)
     sub_image = get_subvolume(image, bounding_box)
     sub_mask = get_subvolume(mask, bounding_box)
-    sub_noise_image = get_subvolume(noise_image, bounding_box)
+    sub_texture_image = get_subvolume(texture_image, bounding_box)
 
     if simplex_path is not None:
-        sub_noise_image = add_simplex_noise(
-            sub_noise_image,
+        sub_texture_image = add_simplex_noise(
+            sub_texture_image,
             image,
             simplex_path,
         )
 
-    sub_image = sitk.Cast(sub_image, noise_image.GetPixelID())
-    sub_mask = sitk.Cast(sub_mask, noise_image.GetPixelID())
+    sub_image = sitk.Cast(sub_image, texture_image.GetPixelID())
+    sub_mask = sitk.Cast(sub_mask, texture_image.GetPixelID())
     sub_mask = sitk.SmoothingRecursiveGaussian(sub_mask, sigmas)
     alpha = sub_mask
 
     assert alpha.GetSize() == sub_image.GetSize()
-    assert alpha.GetSize() == sub_noise_image.GetSize()
+    assert alpha.GetSize() == sub_texture_image.GetSize()
     assert alpha.GetPixelID() == sub_image.GetPixelID()
-    assert alpha.GetPixelID() == sub_noise_image.GetPixelID()
+    assert alpha.GetPixelID() == sub_texture_image.GetPixelID()
 
-    sub_image_resected = alpha * sub_noise_image + (1 - alpha) * sub_image
+    sub_image_resected = alpha * sub_texture_image + (1 - alpha) * sub_image
     sub_image_resected = sitk.Cast(sub_image_resected, image.GetPixelID())
 
     f = sitk.PasteImageFilter()
@@ -118,6 +110,21 @@ def blend(
     f.SetSourceSize(bounding_box[3:])
     image_resected = f.Execute(image, sub_image_resected)
     return image_resected
+
+
+def get_texture_image(image, noise_image, texture):
+    if texture == 'dark':
+        new_mean = get_percentile(image, 1)
+        texture_image = image * 0 + new_mean
+    elif texture == 'random':
+        percentile = torch.randint(1, 100, (1,)).item()  # i.e., [1, 99]
+        new_mean = get_percentile(image, percentile)
+        texture_image = image * 0 + new_mean
+    elif texture == 'csf':
+        texture_image = noise_image
+    else:
+        raise RuntimeError(F'Texture not recognized: {texture}')
+    return texture_image
 
 
 def clean_outside_resectable(

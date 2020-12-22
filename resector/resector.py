@@ -1,5 +1,6 @@
+import numpy as np
 import SimpleITK as sitk
-from .texture import blend, add_wm_lesion, add_clot
+from .texture import blend, add_wm_lesion, add_clot, get_texture_image
 from .mesh import (
     get_resection_poly_data,
     get_ellipsoid_poly_data,
@@ -39,10 +40,13 @@ def resect(
         ):
     image = sitk.Cast(image, sitk.sitkFloat32)
 
+    if texture == 'csf' and noise_image is None:
+        raise RuntimeError('CSF image is needed if texture is "csf"')
+
     original_image = image
     center_ras = get_random_voxel_ras(gray_matter_mask)
 
-    if shape is 'noisy':
+    if shape == 'noisy':
         with timer('Noisy mesh', verbose):
             noisy_poly_data = get_resection_poly_data(
                 center_ras,
@@ -104,17 +108,19 @@ def resect(
         # Use largest connected component only
         with timer('largest connected component', verbose):
             resection_mask = get_largest_connected_component(resection_mask)
+
     with timer('blending', verbose):
+        texture_image = get_texture_image(image, noise_image, texture)
+        assert texture_image is not None
         resected_image = blend(
             image,
-            noise_image,
+            texture_image,
             resection_mask,
             sigmas,
             simplex_path=simplex_path,
-            texture=texture,
         )
 
-    center_clot_ras = None
+    center_clot_ras = np.array(3 * (np.nan,))
     if clot:
         with timer('clot', verbose):
             resected_image, center_clot_ras = add_clot(

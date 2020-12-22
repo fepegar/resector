@@ -98,7 +98,7 @@ class RandomResection:
 
             add_wm = resection_params['add_wm_lesion']
             add_clot = resection_params['add_clot']
-            use_csf_image = self.texture is None or add_wm or add_clot
+            use_csf_image = self.texture == 'csf' or add_wm or add_clot
             if use_csf_image:
                 noise_image = subject['resection_noise'].as_sitk()
             else:

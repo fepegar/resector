@@ -18,11 +18,11 @@ from pathlib import Path
 @click.option('--volumes-path', '-p', type=click.Path(exists=True))
 @click.option('--simplex-path', '-n', type=click.Path(exists=True))
 @click.option('--std-blur', type=float)
-@click.option('--shape', type=click.Choice(['ellipsoid', 'cuboid', 'noisy']), default='noisy')
-@click.option('--texture', type=click.Choice(['dark', 'random', 'csf']), default='csf')
-@click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False)
-@click.option('--clot/--no-clot', '-c', type=bool, default=False)
-@click.option('--verbose/--no-verbose', '-v', type=bool, default=False)
+@click.option('--shape', type=click.Choice(['ellipsoid', 'cuboid', 'noisy']), default='noisy', show_default=True)
+@click.option('--texture', type=click.Choice(['dark', 'random', 'csf']), default='csf', show_default=True)
+@click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False, show_default=True)
+@click.option('--clot/--no-clot', '-c', type=bool, default=False, show_default=True)
+@click.option('--verbose/--no-verbose', '-v', type=bool, default=False, show_default=True)
 def main(
         input_path,
         parcellation_path,
