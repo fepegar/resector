@@ -11,6 +11,8 @@ import SimpleITK as sitk
 
 
 CHECK_QFAC = False
+debug_dir = None
+debug_num_files = 0
 
 
 def read_itk(image_path):
@@ -106,3 +108,27 @@ def write_poly_data(poly_data, path, flip=False):
     writer.SetInputData(poly_data)
     writer.SetFileName(str(path))
     return writer.Write()
+
+
+def save_debug(x):
+    global debug_dir
+    global debug_num_files
+    if debug_dir is None:
+        return
+    debug_dir.mkdir(exist_ok=True, parents=True)
+    # https://stackoverflow.com/a/10361425/3956024
+    import traceback
+    stack = traceback.extract_stack()
+    filename, lineno, function_name, code = stack[-2]
+    filename = Path(filename).stem
+    varname = code.split('(')[-1][:-1]
+    out_stem = f'{debug_num_files:02d}_{filename}_{lineno}_{function_name}_{varname}'
+    if isinstance(x, vtk.vtkPolyData):
+        path = debug_dir / f'{out_stem}.vtp'
+        write_poly_data(x, path, flip=True)
+    elif isinstance(x, sitk.Image):
+        path = debug_dir / f'{out_stem}.nii.gz'
+        write(x, path)
+    else:
+        raise TypeError(f'Type not understood: {type(x)}')
+    debug_num_files += 1

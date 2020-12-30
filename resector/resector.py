@@ -14,6 +14,7 @@ from .image import (
     not_empty,
 )
 from .timer import timer
+from .io import save_debug
 
 
 def resect(
@@ -56,12 +57,14 @@ def resect(
                 sphere_poly_data=sphere_poly_data,
                 verbose=verbose,
             )
+            save_debug(noisy_poly_data)
 
         with timer('mesh to volume', verbose):
             raw_resection_mask = mesh_to_volume(
                 noisy_poly_data,
                 resectable_hemisphere_mask,
             )
+            save_debug(raw_resection_mask)
 
         if wm_lesion:
             assert noise_image is not None
@@ -102,9 +105,10 @@ def resect(
     with timer('intersection with resectable', verbose):
         resection_mask = sitk_and(
             raw_resection_mask, resectable_hemisphere_mask)
+        save_debug(resection_mask)
     assert not_empty(resection_mask), 'Masked resection label is empty'
 
-    if shape is None:  # noisy sphere can generate multiple components?
+    if shape == 'noisy':  # noisy sphere can generate multiple components?
         # Use largest connected component only
         with timer('largest connected component', verbose):
             resection_mask = get_largest_connected_component(resection_mask)
@@ -119,6 +123,7 @@ def resect(
             sigmas,
             simplex_path=simplex_path,
         )
+        save_debug(resected_image)
 
     center_clot_ras = np.array(3 * (np.nan,))
     if clot:

@@ -12,6 +12,7 @@ from .image import (
     erode_bounding_box,
 )
 from .mesh import scale_poly_data, mesh_to_volume, get_resection_poly_data
+from .io import save_debug
 
 
 def sample_simplex_noise(
@@ -133,11 +134,12 @@ def clean_outside_resectable(
         resectable_hemisphere_mask,
         gray_matter_mask,
         ):
-    mask = sitk.Xor(resectable_hemisphere_mask, gray_matter_mask)
+    resectable_no_gm = sitk.Xor(resectable_hemisphere_mask, gray_matter_mask)
+    save_debug(resectable_no_gm)
     clean_resected = blend(
         image,
         resected_image,
-        mask,
+        resectable_no_gm,
         (1, 1, 1),
     )
     return clean_resected
@@ -158,7 +160,7 @@ def get_bright_noise(image, csf_noise, percentiles):
 def add_wm_lesion(
         image,
         original_image,
-        csf_noise_image,
+        csf_image,
         poly_data,
         scale_factor,
         center_ras,
@@ -169,14 +171,18 @@ def add_wm_lesion(
         verbose=False,
         ):
     wm_lesion_poly_data = scale_poly_data(poly_data, scale_factor, center_ras)
+    save_debug(wm_lesion_poly_data)
     with timer('white matter mesh to volume', verbose):
         wm_lesion_mask = mesh_to_volume(wm_lesion_poly_data, resectable_mask)
+        save_debug(wm_lesion_mask)
     with timer('white matter blend', verbose):
-        image = blend(image, csf_noise_image, wm_lesion_mask, sigmas, pad=pad)
+        image_wm = blend(image, csf_image, wm_lesion_mask, sigmas, pad=pad)
+        save_debug(image_wm)
     with timer('white matter clean', verbose):
-        image = clean_outside_resectable(
-            original_image, image, resectable_mask, gray_matter_mask)
-    return image
+        image_wm_smooth = clean_outside_resectable(
+            original_image, image_wm, resectable_mask, gray_matter_mask)
+        save_debug(image_wm_smooth)
+    return image_wm_smooth
 
 
 def add_clot(
@@ -197,6 +203,8 @@ def add_clot(
     with timer(f'erosion with radius {resection_erosion_radius}', verbose):
         eroded_resection_mask = erode_bounding_box(
             resection_mask, resection_erosion_radius)
+        save_debug(eroded_resection_mask)
+
     with timer('random voxel RAS', verbose):
         center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
     resection_radii = np.array(resection_radii)
@@ -213,14 +221,18 @@ def add_clot(
             sphere_poly_data=sphere_poly_data,
             verbose=verbose,
         )
+        save_debug(clot_poly_data)
+
     with timer('clot mesh to volume', verbose):
         raw_clot_mask = mesh_to_volume(
             clot_poly_data,
             resection_mask,
         )
+        save_debug(raw_clot_mask)
 
     with timer('intersection', verbose):
         clot_mask = sitk_and(raw_clot_mask, eroded_resection_mask)
+        save_debug(clot_mask)
 
     with timer('bright noise', verbose):
         bright_noise_image = get_bright_noise(
@@ -228,12 +240,14 @@ def add_clot(
             csf_noise_image,
             percentiles,
         )
+        save_debug(bright_noise_image)
 
     with timer('Blending', verbose):
-        resected_image = blend(
+        resected_image_with_clot = blend(
             resected_image,
             bright_noise_image,
             clot_mask,
             sigmas,
         )
-    return resected_image, center_clot_ras
+        save_debug(resected_image_with_clot)
+    return resected_image_with_clot, center_clot_ras
