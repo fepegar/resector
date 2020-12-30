@@ -84,7 +84,6 @@ class RandomResection:
             self.wm_lesion_p,
             self.clot_p,
         )
-
         # Convert images to SimpleITK
         with timer('Convert to SITK', self.verbose):
             t1_pre = subject[self.image_name].as_sitk()

@@ -66,14 +66,19 @@ def get_random_voxel(mask, border=False, verbose=False):
     array = sitk.GetArrayViewFromImage(image)
     coords = np.array(np.where(array)).T  # N x 3
     N = len(coords)
-    random_index = torch.randint(N, (1,)).item()
-    coords_voxel = coords[random_index]
-    coords_voxel = [int(n) for n in reversed(coords_voxel)]  # NumPy vs ITK
+    if not N:
+        coords_voxel = None
+    else:
+        random_index = torch.randint(N, (1,)).item()
+        coords_voxel = coords[random_index]
+        coords_voxel = [int(n) for n in reversed(coords_voxel)]  # NumPy vs ITK
     return coords_voxel
 
 
 def get_random_voxel_ras(mask):
     voxel = get_random_voxel(mask)
+    if voxel is None:
+        return None
     center_lps = mask.TransformIndexToPhysicalPoint(tuple(voxel))
     l, p, s = center_lps
     center_ras = -l, -p, s
