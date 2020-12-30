@@ -76,7 +76,7 @@ def blend(
         image,
         texture_image,
         mask,
-        sigmas,
+        sigmas=None,
         simplex_path=None,
         pad=10,
         ):
@@ -94,7 +94,8 @@ def blend(
 
     sub_image = sitk.Cast(sub_image, texture_image.GetPixelID())
     sub_mask = sitk.Cast(sub_mask, texture_image.GetPixelID())
-    sub_mask = sitk.SmoothingRecursiveGaussian(sub_mask, sigmas)
+    if sigmas is not None:
+        sub_mask = sitk.SmoothingRecursiveGaussian(sub_mask, sigmas)
     alpha = sub_mask
 
     assert alpha.GetSize() == sub_image.GetSize()
@@ -199,6 +200,12 @@ def add_clot(
             resection_mask, resection_erosion_radius)
     with timer('random voxel RAS', verbose):
         center_clot_ras = get_random_voxel_ras(eroded_resection_mask)
+    if center_clot_ras is None:
+        import warnings
+        path = '/tmp/res_mask_seg.nii'
+        warnings.warn(f'Eroded resection mask is empty. Saving to {path}')
+        sitk.WriteImage(resection_mask, path)
+        return resected_image, (-1, -1, -1)
     resection_radii = np.array(resection_radii)
     tensor = torch.FloatTensor(3)
     clot_size_ratios = tensor.uniform_(*clot_size_ratio_range).numpy()
@@ -230,10 +237,10 @@ def add_clot(
         )
 
     with timer('Blending', verbose):
-        resected_image = blend(
+        image_with_clot = blend(
             resected_image,
             bright_noise_image,
             clot_mask,
             sigmas,
         )
-    return resected_image, center_clot_ras
+    return image_with_clot, center_clot_ras
