@@ -11,7 +11,7 @@ from .image import (
     sitk_and,
     get_random_voxel_ras,
     get_cuboid_image,
-    not_empty,
+    empty,
 )
 from .timer import timer
 from .io import save_debug
@@ -33,9 +33,10 @@ def resect(
         clot=False,
         clot_erosion_radius=2,
         clot_size_ratio=(3, 8),
-        clot_percentiles=(80, 99),
+        clot_percentiles=(90, 99),
         sphere_poly_data=None,
         noise_offset=None,
+        center_ras=None,
         simplex_path=None,
         verbose=False,
         ):
@@ -45,7 +46,8 @@ def resect(
         raise RuntimeError('CSF image is needed if texture is "csf"')
 
     original_image = image
-    center_ras = get_random_voxel_ras(gray_matter_mask)
+    if center_ras is None:
+        center_ras = get_random_voxel_ras(gray_matter_mask)
 
     if shape == 'noisy':
         with timer('Noisy mesh', verbose):
@@ -106,7 +108,8 @@ def resect(
         resection_mask = sitk_and(
             raw_resection_mask, resectable_hemisphere_mask)
         save_debug(resection_mask)
-    assert not_empty(resection_mask), 'Masked resection label is empty'
+    if empty(resection_mask):
+        raise RuntimeError('Resection mask empty')
 
     if shape == 'noisy':  # noisy sphere can generate multiple components?
         # Use largest connected component only
@@ -140,7 +143,7 @@ def resect(
                 noise_offset,
                 sphere_poly_data,
                 clot_percentiles,
-                sigmas,
+                (0.5, 0.5, 0.5),
                 verbose=verbose,
             )
 

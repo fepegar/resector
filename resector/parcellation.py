@@ -57,6 +57,23 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
     return mask
 
 
+def get_white_matter_mask(parcellation_path, hemisphere):
+    assert hemisphere in ('left', 'right')
+    parcellation_nii = nib.load(str(parcellation_path))
+    parcellation = parcellation_nii.get_data().astype(np.uint8)
+    array = np.zeros_like(parcellation)
+    lines = get_color_table()
+    progress = tqdm(lines, leave=False)
+    for line in progress:
+        line = line.lower()
+        if 'white' in line and hemisphere in line:
+            label, name = line.split()[:2]
+            label = int(label)
+            array[parcellation == label] = 1
+    mask = nib_to_sitk(array, parcellation_nii.affine) > 0
+    return mask
+
+
 def get_csf_mask(parcellation_path, erode_radius=1) -> sitk.Image:
     parcellation_nii = nib.load(str(parcellation_path))
     parcellation_array = parcellation_nii.get_data().astype(np.uint8)

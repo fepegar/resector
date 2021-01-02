@@ -37,6 +37,7 @@ class RandomResection:
             clot_p=1,
             shape='noisy',
             texture='csf',
+            center_ras=None,
             verbose=False,
             ):
         """
@@ -71,6 +72,7 @@ class RandomResection:
         self.texture = texture
         self.wm_lesion_p = wm_lesion_p
         self.clot_p = clot_p
+        self.center_ras = center_ras
         self.verbose = verbose
 
     def __call__(self, subject: tio.Subject):
@@ -120,6 +122,7 @@ class RandomResection:
                 wm_lesion=add_wm,
                 clot=add_clot,
                 simplex_path=self.simplex_path,
+                center_ras=self.center_ras,
                 verbose=self.verbose,
             )
         resected_brain, resection_mask, resection_center, clot_center = results
@@ -175,7 +178,11 @@ class RandomResection:
             clot_p,
             ):
         # Hemisphere
-        hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
+        if self.center_ras is None:
+            hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
+        else:
+            # Assuming brain in MNI space
+            hemisphere = Hemisphere.LEFT if self.center_ras[0] < 0 else Hemisphere.RIGHT
 
         # Equivalent sphere volume
         if volumes is None:

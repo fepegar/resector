@@ -103,8 +103,8 @@ def get_cuboid_image(radii_world, reference: sitk.Image, center_ras):
     return result
 
 
-def not_empty(image):
-    return sitk.GetArrayViewFromImage(image).sum() > 0
+def empty(image):
+    return sitk.GetArrayViewFromImage(image).sum() == 0
 
 
 def erode_bounding_box(image, radius):

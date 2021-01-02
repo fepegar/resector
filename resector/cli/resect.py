@@ -18,6 +18,7 @@ from pathlib import Path
 @click.option('--std-blur', type=float)
 @click.option('--shape', type=click.Choice(['ellipsoid', 'cuboid', 'noisy']), default='noisy', show_default=True)
 @click.option('--texture', type=click.Choice(['dark', 'random', 'csf']), default='csf', show_default=True)
+@click.option('--center-ras', '-r', nargs=3, type=float)
 @click.option('--wm-lesion/--no-wm-lesion', '-w', type=bool, default=False, show_default=True)
 @click.option('--clot/--no-clot', '-b', type=bool, default=False, show_default=True)
 @click.option('--verbose/--no-verbose', '-v', type=bool, default=False, show_default=True)
@@ -36,6 +37,7 @@ def main(
         std_blur,
         shape,
         texture,
+        center_ras,
         wm_lesion,
         clot,
         verbose,
@@ -73,6 +75,7 @@ def main(
         kwargs['verbose'] = verbose
         kwargs['shape'] = shape
         kwargs['texture'] = texture
+        kwargs['center_ras'] = center_ras
 
         transform = tio.Compose((
             tio.ToCanonical(),
