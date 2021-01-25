@@ -178,7 +178,7 @@ class RandomResection:
             clot_p,
             ):
         # Hemisphere
-        if self.center_ras is None:
+        if not self.center_ras or self.center_ras is None:
             hemisphere = Hemisphere.LEFT if self.flip_coin() else Hemisphere.RIGHT
         else:
             # Assuming brain in MNI space

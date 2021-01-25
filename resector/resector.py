@@ -32,7 +32,7 @@ def resect(
         wm_lesion=False,
         clot=False,
         clot_erosion_radius=2,
-        clot_size_ratio=(3, 8),
+        clot_size_ratio=(1,1),  ######################(3, 8),
         clot_percentiles=(90, 99),
         sphere_poly_data=None,
         noise_offset=None,
@@ -46,7 +46,7 @@ def resect(
         raise RuntimeError('CSF image is needed if texture is "csf"')
 
     original_image = image
-    if center_ras is None:
+    if not center_ras or center_ras is None:  # could be an empty tuple
         center_ras = get_random_voxel_ras(gray_matter_mask)
 
     if shape == 'noisy':

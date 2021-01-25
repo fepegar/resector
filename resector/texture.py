@@ -19,7 +19,7 @@ def sample_simplex_noise(
         simplex_path,
         reference,
         size,
-        gamma=4,
+        gamma=1,
         # persistence_index=2,
         ):
     # Gamma expansion
@@ -34,11 +34,15 @@ def sample_simplex_noise(
     j_ini = torch.randint(0, mj, (1,)).item()
     k_ini = torch.randint(0, mk, (1,)).item()
     index_ini = i_ini, j_ini, k_ini
+    index_ini = 0, 0, 0
     i_fin = i_ini + ci
     j_fin = j_ini + cj
     k_fin = k_ini + ck
     sub_simplex_array = nii.dataobj[i_ini:i_fin, j_ini:j_fin, k_ini:k_fin]
-    sub_simplex_array **= gamma
+    sub_simplex_array -= sub_simplex_array.min()
+    sub_simplex_array /= sub_simplex_array.max()
+    if gamma != 1:
+        sub_simplex_array **= gamma
     sub_simplex = sitk.GetImageFromArray(sub_simplex_array)
     sub_simplex.SetOrigin(reference.GetOrigin())
     sub_simplex.SetDirection(reference.GetDirection())
@@ -55,17 +59,19 @@ def add_simplex_noise(
         sub_noise_image,
         full_image,
         simplex_path,
-        percentile=95,
+        percentile=99.5,
         ):
     array = sitk.GetArrayViewFromImage(full_image)
-    max_simplex_value = np.percentile(array, percentile)
+    min_simplex_value, max_simplex_value = np.percentile(array, (0.5, 99.9))
     simplex_patch, index_ini = sample_simplex_noise(
         simplex_path,
         sub_noise_image,
         sub_noise_image.GetSize(),
     )  # [0, 1]
-    simplex_patch *= max_simplex_value
-    return sub_noise_image + simplex_patch
+    simplex_patch *= (max_simplex_value - min_simplex_value)
+    simplex_patch += min_simplex_value
+    # return sub_noise_image + simplex_patch
+    return simplex_patch
 
 
 def get_percentile(image, percentile):

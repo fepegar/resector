@@ -28,7 +28,7 @@ test_requirements = [ ]
 setup(
     author="Fernando Perez-Garcia",
     author_email='fernando.perezgarcia.17@ucl.ac.uk',
-    python_requires='>=3.6, <=3.8',
+    python_requires='>=3.6, <3.9',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
