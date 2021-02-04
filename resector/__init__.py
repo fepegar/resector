@@ -4,7 +4,7 @@
 
 __author__ = """Fernando Perez-Garcia"""
 __email__ = 'fernando.perezgarcia.17@ucl.ac.uk'
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 from .timer import timer
 from .resector import resect
