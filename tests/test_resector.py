@@ -8,9 +8,6 @@ import unittest
 import torchio as tio
 from click.testing import CliRunner
 
-from resector import resector
-from resector import cli
-
 
 class TestResector(unittest.TestCase):
     """Tests for `resector` package."""
@@ -26,10 +23,3 @@ class TestResector(unittest.TestCase):
 
     def test_command_line_interface(self):
         """Test the CLI."""
-        runner = CliRunner()
-        result = runner.invoke(cli.main)
-        assert result.exit_code == 0
-        assert 'resector.cli.main' in result.output
-        help_result = runner.invoke(cli.main, ['--help'])
-        assert help_result.exit_code == 0
-        assert '--help  Show this message and exit.' in help_result.output
