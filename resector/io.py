@@ -123,4 +123,7 @@ def save_debug(x):
     debug_num_files += 1
 
 
-nib_to_sitk = tio.io.nib_to_sitk
+def nib_to_sitk(array: np.ndarray, affine: np.ndarray):
+    assert array.ndim == 3
+    array = array[np.newaxis]
+    return tio.io.nib_to_sitk(array, affine)
