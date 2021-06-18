@@ -4,8 +4,10 @@ import shutil
 import struct
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+
 import vtk
 import numpy as np
+import torchio as tio
 import nibabel as nib
 import SimpleITK as sitk
 
@@ -59,19 +61,6 @@ def write(image, image_path, set_sform_code_zero=True):
         nii.to_filename(image_path)
     if CHECK_QFAC:
         check_qfac(image_path)
-
-
-def nib_to_sitk(array, affine):
-    """
-    This actually seems faster than .parcellation.get_image_from_reference
-    """
-    array = array if isinstance(array, np.ndarray) else array.numpy()
-    with NamedTemporaryFile(suffix='.nii') as f:
-        nib.Nifti1Image(array, affine).to_filename(f.name)
-        if CHECK_QFAC:
-            check_qfac(f.name)
-        image = read_itk(f.name)
-    return image
 
 
 def get_sphere_poly_data():
@@ -132,3 +121,6 @@ def save_debug(x):
     else:
         raise TypeError(f'Type not understood: {type(x)}')
     debug_num_files += 1
+
+
+nib_to_sitk = tio.io.nib_to_sitk
