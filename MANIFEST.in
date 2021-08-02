@@ -1,8 +1,8 @@
-include AUTHORS.rst
 include CONTRIBUTING.rst
 include HISTORY.rst
 include LICENSE
-include README.rst
+include README.md
+include BrainAnatomyLabelsV3_0.txt
 
 recursive-include tests *
 recursive-exclude * __pycache__
