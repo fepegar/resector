@@ -64,7 +64,7 @@ def write(image, image_path, set_sform_code_zero=True):
 
 
 def get_sphere_poly_data():
-    resources_dir = Path(__file__).parent.parent / 'resources'
+    resources_dir = Path(__file__).parent / 'resources'
     mesh_path = resources_dir / 'geodesic_polyhedron.vtp'
     if not mesh_path.is_file():
         raise FileNotFoundError(f'{mesh_path} does not exist')
