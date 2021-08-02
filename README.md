@@ -1,8 +1,7 @@
 # `resector`
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/fepegar/resector/master/docs/images/60_examples_resized_50.gif"
-        alt="Resections">
+    <img src="https://raw.githubusercontent.com/fepegar/resector/master/docs/images/60_examples_resized_50.gif" alt="Resections">
 </p>
 
 Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
@@ -11,45 +10,62 @@ corresponding [geodesic information flows (GIF) brain parcellation (version 3.0)
 
 ## Credit
 
-If you use this library for your research, please cite our MICCAI 2020 paper:
+If you use this library for your research, please cite the following publications:
 
-[F. Pérez-García, R. Rodionov, A. Alim-Marvasti, R. Sparks, J. S. Duncan and
-S. Ourselin. *Simulation of Brain Resection for Cavity Segmentation Using
-Self-Supervised and Semi-Supervised Learning*](https://link.springer.com/chapter/10.1007%2F978-3-030-59716-0_12).
+[Pérez-García, F., Dorent, R., Rizzi, M., Cardinale, F., Frazzini, V., Navarro, V., Essert, C., Ollivier, I., Vercauteren, T., Sparks, R., Duncan, J.S., Ourselin, S.: *A self-supervised learning strategy for postoperative brain cavity segmentation simulating resections*. International Journal of Computer Assisted Radiology and Surgery (Jun 2021)](https://doi.org/10.1007/s11548-021-02420-2)
+
+[Pérez-García, F., Rodionov, R., Alim-Marvasti, A., Sparks, R., Duncan, J.S., Ourselin, S.: Simulation of Brain Resection for Cavity Segmentation Using Selfsupervised and Semi-supervised Learning. In: Martel, A.L., Abolmaesumi, P., Stoyanov, D., Mateus, D., Zuluaga, M.A., Zhou, S.K., Racoceanu, D., Joskowicz, L. (eds.) Medical Image Computing and Computer Assisted Intervention – MICCAI 2020. pp. 115–125. Lecture Notes in Computer Science, Springer International Publishing, Cham (2020)](https://doi.org/10.1007/978-3-030-59716-0_12)
 
 Bibtex:
 
 ```bibtex
-@InProceedings{10.1007/978-3-030-59716-0_12,
-    author="P{\'e}rez-Garc{\'i}a, Fernando
-    and Rodionov, Roman
-    and Alim-Marvasti, Ali
-    and Sparks, Rachel
-    and Duncan, John S.
-    and Ourselin, S{\'e}bastien",
-    title="Simulation of Brain Resection for Cavity Segmentation Using Self-supervised and Semi-supervised Learning",
-    booktitle="Medical Image Computing and Computer Assisted Intervention -- MICCAI 2020",
-    year="2020",
-    publisher="Springer International Publishing",
-    address="Cham",
-    pages="115--125",
-    isbn="978-3-030-59716-0"
+@inproceedings{perez-garcia_simulation_2020,
+    address = {Cham},
+    series = {Lecture {Notes} in {Computer} {Science}},
+    title = {Simulation of {Brain} {Resection} for {Cavity} {Segmentation} {Using} {Self}-supervised and {Semi}-supervised {Learning}},
+    isbn = {978-3-030-59716-0},
+    doi = {10.1007/978-3-030-59716-0\_12},
+    language = {en},
+    booktitle = {Medical {Image} {Computing} and {Computer} {Assisted} {Intervention} {\textendash} {MICCAI} 2020},
+    publisher = {Springer International Publishing},
+    author = {P{\'e}rez-Garc{\'i}a, Fernando and Rodionov, Roman and Alim-Marvasti, Ali and Sparks, Rachel and Duncan, John S. and Ourselin, S{\'e}bastien},
+    editor = {Martel, Anne L. and Abolmaesumi, Purang and Stoyanov, Danail and Mateus, Diana and Zuluaga, Maria A. and Zhou, S. Kevin and Racoceanu, Daniel and Joskowicz, Leo},
+    year = {2020},
+    keywords = {Segmentation, Self-supervised learning, Neurosurgery},
+    pages = {115--125},
+}
+
+@article{perez-garcia_self-supervised_2021,
+    title = {A self-supervised learning strategy for postoperative brain cavity segmentation simulating resections},
+    issn = {1861-6429},
+    url = {https://doi.org/10.1007/s11548-021-02420-2},
+    doi = {10.1007/s11548-021-02420-2},
+    language = {en},
+    urldate = {2021-06-14},
+    journal = {International Journal of Computer Assisted Radiology and Surgery},
+    author = {P{\'e}rez-Garc{\'i}a, Fernando and Dorent, Reuben and Rizzi, Michele and Cardinale, Francesco and Frazzini, Valerio and Navarro, Vincent and Essert, Caroline and Ollivier, Ir{\`e}ne and Vercauteren, Tom and Sparks, Rachel and Duncan, John S. and Ourselin, S{\'e}bastien},
+    month = jun,
+    year = {2021},
+    file = {Springer Full Text PDF:/Users/fernando/Zotero/storage/SM9WHUB7/P{\'e}rez-Garc{\'i}a et al. - 2021 - A self-supervised learning strategy for postoperat.pdf:application/pdf},
 }
 ```
 
-[[Preprint on arXiv](https://arxiv.org/abs/2006.15693)]
-
 ## Installation
 
+Using [`conda`](https://docs.conda.io/en/latest/miniconda.html) is recommended:
+
 ```shell
-$ git clone https://github.com/fepegar/resector.git
-$ pip install --editable ./resector
+conda create --name resenv python=3.8 --yes && conda activate resenv
+pip install light-the-torch
+ltt install torch
+pip install git+https://github.com/fepegar/resector
+resect --help
 ```
 
 ## Usage
 
 ```shell
-$ resect t1.nii.gz gif_parcellation.nii.gz t1_resected.nii.gz t1_resection_label.nii.gz
+resect t1.nii.gz gif_parcellation.nii.gz t1_resected.nii.gz t1_resection_label.nii.gz
 ```
 
 Run `resect --help` for more options.
