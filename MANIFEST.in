@@ -3,7 +3,7 @@ include HISTORY.rst
 include LICENSE
 include README.md
 include resector/BrainAnatomyLabelsV3_0.txt
-include resector/resources.*
+include resector/resources/*
 
 recursive-include tests *
 recursive-exclude * __pycache__
