@@ -12,9 +12,9 @@ corresponding [geodesic information flows (GIF) brain parcellation (version 3.0)
 
 If you use this library for your research, please cite the following publications:
 
-[Pérez-García, F., Dorent, R., Rizzi, M., Cardinale, F., Frazzini, V., Navarro, V., Essert, C., Ollivier, I., Vercauteren, T., Sparks, R., Duncan, J.S., Ourselin, S.: *A self-supervised learning strategy for postoperative brain cavity segmentation simulating resections*. International Journal of Computer Assisted Radiology and Surgery (Jun 2021)](https://doi.org/10.1007/s11548-021-02420-2)
+[Pérez-García, F., Dorent, R., Rizzi, M., Cardinale, F., Frazzini, V., Navarro, V., Essert, C., Ollivier, I., Vercauteren, T., Sparks, R., Duncan, J.S., Ourselin, S.: *A self-supervised learning strategy for postoperative brain cavity segmentation simulating resections*. International Journal of Computer Assisted Radiology and Surgery  – **IJCARS** (Jun 2021)](https://doi.org/10.1007/s11548-021-02420-2)
 
-[Pérez-García, F., Rodionov, R., Alim-Marvasti, A., Sparks, R., Duncan, J.S., Ourselin, S.: Simulation of Brain Resection for Cavity Segmentation Using Selfsupervised and Semi-supervised Learning. In: Martel, A.L., Abolmaesumi, P., Stoyanov, D., Mateus, D., Zuluaga, M.A., Zhou, S.K., Racoceanu, D., Joskowicz, L. (eds.) Medical Image Computing and Computer Assisted Intervention – MICCAI 2020. pp. 115–125. Lecture Notes in Computer Science, Springer International Publishing, Cham (2020)](https://doi.org/10.1007/978-3-030-59716-0_12)
+[Pérez-García, F., Rodionov, R., Alim-Marvasti, A., Sparks, R., Duncan, J.S., Ourselin, S.: *Simulation of Brain Resection for Cavity Segmentation Using Selfsupervised and Semi-supervised Learning*. In: Medical Image Computing and Computer Assisted Intervention – **MICCAI 2020**. pp. 115–125. Lecture Notes in Computer Science, Springer International Publishing, Cham (2020)](https://doi.org/10.1007/978-3-030-59716-0_12)
 
 Bibtex:
 
@@ -29,7 +29,6 @@ Bibtex:
     booktitle = {Medical {Image} {Computing} and {Computer} {Assisted} {Intervention} {\textendash} {MICCAI} 2020},
     publisher = {Springer International Publishing},
     author = {P{\'e}rez-Garc{\'i}a, Fernando and Rodionov, Roman and Alim-Marvasti, Ali and Sparks, Rachel and Duncan, John S. and Ourselin, S{\'e}bastien},
-    editor = {Martel, Anne L. and Abolmaesumi, Purang and Stoyanov, Danail and Mateus, Diana and Zuluaga, Maria A. and Zhou, S. Kevin and Racoceanu, Daniel and Joskowicz, Leo},
     year = {2020},
     keywords = {Segmentation, Self-supervised learning, Neurosurgery},
     pages = {115--125},
@@ -66,6 +65,14 @@ resect --help
 
 ```shell
 resect t1.nii.gz gif_parcellation.nii.gz t1_resected.nii.gz t1_resection_label.nii.gz
+```
+
+[TorchIO](https://torchio.readthedocs.io/), which is installed with `resector`, can be used to download some sample images:
+
+```shell
+T1=`python -c "import torchio as tio; print(tio.datasets.FPG().t1.path)"`
+GIF=`python -c "import torchio as tio; print(tio.datasets.FPG().seg.path)"`
+resect $T1 $GIF t1_resected.nii.gz t1_resection_label.nii.gz
 ```
 
 Run `resect --help` for more options.
