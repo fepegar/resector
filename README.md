@@ -8,6 +8,8 @@ Implementation of a [TorchIO](https://torchio.readthedocs.io/) transform
 used to simulate a resection cavity from a T1-weighted brain MRI and a
 corresponding [geodesic information flows (GIF) brain parcellation (version 3.0)](http://niftyweb.cs.ucl.ac.uk/program.php?p=GIF).
 
+The corresponding talk at MICCAI 2020 is available on YouTube: [MICCAI 2020 - Fernando Pérez-García - Simulation of resection cavity for self-supervised learning](https://www.youtube.com/watch?v=RPKwlOw4r0Q).
+
 ## Credit
 
 If you use this library for your research, please cite the following publications:
@@ -76,3 +78,9 @@ resect $T1 $GIF t1_resected.nii.gz t1_resection_label.nii.gz
 ```
 
 Run `resect --help` for more options.
+
+## Funding
+
+This work was funded by the [Engineering and Physical Sciences Research Council (EPSRC)](https://epsrc.ukri.org/) and the [Wellcome Trust](https://wellcome.org/).
+
+It was additionally supported by the [EPSRC-funded UCL Centre for Doctoral Training in Intelligent, Integrated Imaging in Healthcare (i4health)](https://www.ucl.ac.uk/intelligent-imaging-healthcare/) and the [Wellcome / EPSRC Centre for Interventional and Surgical Sciences (WEISS)](https://www.ucl.ac.uk/interventional-surgical-sciences/).
