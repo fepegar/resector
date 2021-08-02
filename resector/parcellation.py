@@ -126,7 +126,7 @@ def remove_pattern(array, pattern):
 
 
 def get_color_table():
-    labels_path = Path(__file__).parent.parent / 'BrainAnatomyLabelsV3_0.txt'
+    labels_path = Path(__file__).parent / 'BrainAnatomyLabelsV3_0.txt'
     lines = labels_path.read_text().splitlines()
     return lines
 
