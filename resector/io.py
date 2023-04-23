@@ -52,7 +52,7 @@ def write(image, image_path, set_sform_code_zero=True):
         check_qfac(image_path)
     if set_sform_code_zero:
         nii = nib.load(image_path)
-        data = nii.get_data()
+        data = np.asanyarray(nii.dataobj)
         if isinstance(data, np.memmap):
             data = np.array(data)
         nii = nib.Nifti1Image(data, nii.affine)

@@ -20,7 +20,7 @@ def get_resectable_hemisphere_mask(
         ):
     assert hemisphere in ('left', 'right')
     parcellation_nii = nib.load(str(parcellation_path))
-    array = parcellation_nii.get_data().astype(np.uint8)
+    array = np.asanyarray(parcellation_nii.dataobj).astype(np.uint8)
     hemisphere_to_remove = 'left' if hemisphere == 'right' else 'right'
     array[array == 1] = 0  # remove external labels
     array[array == 2] = 0  # remove external labels
@@ -41,7 +41,7 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
     """
     assert hemisphere in ('left', 'right')
     parcellation_nii = nib.load(str(parcellation_path))
-    array = parcellation_nii.get_data().astype(np.uint8)
+    array = np.asanyarray(parcellation_nii.dataobj).astype(np.uint8)
     hemisphere_to_remove = 'left' if hemisphere == 'right' else 'right'
     array[array < 5] = 0  # remove CSF
     remove_hemisphere(array, hemisphere_to_remove)
@@ -60,7 +60,7 @@ def get_gray_matter_mask(parcellation_path, hemisphere):
 def get_white_matter_mask(parcellation_path, hemisphere):
     assert hemisphere in ('left', 'right')
     parcellation_nii = nib.load(str(parcellation_path))
-    parcellation = parcellation_nii.get_data().astype(np.uint8)
+    parcellation = np.asanyarray(parcellation_nii.dataobj).astype(np.uint8)
     array = np.zeros_like(parcellation)
     lines = get_color_table()
     progress = tqdm(lines, leave=False)
@@ -76,7 +76,8 @@ def get_white_matter_mask(parcellation_path, hemisphere):
 
 def get_csf_mask(parcellation_path, erode_radius=1) -> sitk.Image:
     parcellation_nii = nib.load(str(parcellation_path))
-    parcellation_array = parcellation_nii.get_data().astype(np.uint8)
+    parcellation_array = np.asanyarray(parcellation_nii.dataobj)
+    parcellation_array = parcellation_array.astype(np.uint8)
     parcellation_array[parcellation_array == 1] = 0  # should I remove this?
     parcellation_array[parcellation_array == 2] = 0
     parcellation_array[parcellation_array == 3] = 0
@@ -165,16 +166,13 @@ def make_noise_image(
         image_path,
         parcellation_path,
         output_path,
-        threshold=True,
-        std_factor=0.25,
         ):
     image_nii = nib.load(str(image_path))
     csf_mask = get_csf_mask(parcellation_path)
-    image_array = image_nii.get_data()
+    image_array = np.asanyarray(image_nii.dataobj)
     csf_mask_array = sitk.GetArrayViewFromImage(csf_mask) > 0  # to bool needed
     csf_mask_array = csf_mask_array.transpose(2, 1, 0)  # sitk to np
     csf_values = image_array[csf_mask_array]
-    # mean, std = get_mean_std_threshold(csf_values, threshold, std_factor)
     mean, std = get_mean_std_histogram(csf_values, 32)
     noise_tensor = torch.FloatTensor(*image_array.shape)
     noise_tensor = noise_tensor.normal_(mean, std)
